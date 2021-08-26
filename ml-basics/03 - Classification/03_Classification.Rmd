@@ -1172,38 +1172,3 @@ Feel like challenging yourself to train a classification model? Try the challeng
 Happy leaRning,
 
 [Eric (R_ic)](https://twitter.com/ericntay), *Gold Microsoft Learn Student Ambassador*.
-
-```{r multi_spec, eval=FALSE, message=TRUE, warning=TRUE, include=FALSE}
-# # Specify a multinomial regression via nnet
-# multireg_spec <- multinom_reg(penalty = tune()) %>%
-#   set_engine("nnet") %>%
-#   set_mode("classification")
-# 
-# # Specify a recipe
-# multireg_recipe <- recipe(species ~ ., data = penguins_train) 
-# 
-# # Bundle model specification and recipe into a workflow
-# multireg_wf <- workflow() %>%
-#   add_recipe(multireg_recipe) %>%
-#   add_model(multireg_spec)
-# 
-# # Grid search
-# tree_grid <- grid_regular(penalty(), levels = 50)
-# 
-# # Resamples
-# folds <- vfold_cv(penguins_train, v = 5, repeats = 1)
-
-
-
-
-```
-
-```{r eval=FALSE, include=FALSE}
-# doParallel::registerDoParallel()
-# 
-# tree_res <- tune_grid(
-#   multireg_wf,
-#   resamples = folds,
-#   grid = tree_grid
-# )
-```
