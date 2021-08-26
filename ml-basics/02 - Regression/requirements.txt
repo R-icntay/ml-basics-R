@@ -7,7 +7,7 @@ library(glue) # Formatting strings
 library(lubridate) # Parsing and manipulating dates
 library(kableExtra) # Generating tables in R
 library(patchwork) # Combines multiple plots
-library(scales)1 # Implementing scaling functions
+library(scales) # Implementing scaling functions
 library(summarytools) # Neatly summarizes numerical and categorical data
 library(plotly) # Implementing interactive plots
 library(glmnet) # Implementing generalized linear models
