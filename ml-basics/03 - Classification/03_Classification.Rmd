@@ -10,22 +10,6 @@ output:
     code_download: yes
 ---
 
-```{r setup, include=FALSE, eval=T}
-library(tidyverse)
-library(tidymodels)
-library(ranger)
-library(vip)
-library(palmerpenguins)
-library(paletteer)
-library(nnet)
-library(skimr)
-library(here)
-library(kernlab)
-# slice <- dplyr::slice
-# eval_metrics <- metric_set(rmse, rsq)
-
-```
-
 ## Buckle up 🚀
 
 In this learning path, we'll learn how to create Machine learning models using `R` 😊. Machine learning is the foundation for predictive modeling and artificial intelligence. We'll learn the core principles of machine learning and how to use common tools and frameworks to train, evaluate, and use machine learning models.
@@ -74,7 +58,7 @@ A threshold value, usually 0.5, is used to determine the predicted class - so if
 
 The best way to learn about classification is to try it for yourself, so that's what you'll do in this exercise.
 
-> We'll require some packages to knock-off this module. You can have them installed as: `install.packages(c('tidyverse', 'tidymodels', 'ranger', 'vip', 'palmerpenguins', 'skimr', 'paletteer', 'nnet', 'here'))`
+> We'll require some packages to knock-off this module. You can have them installed as: `install.packages(c('tidyverse', 'tidymodels', 'ranger', 'vip', 'palmerpenguins', 'skimr', 'paletteer', 'nnet', 'here', 'doParallel'))`
 
 Alternatively, the script below checks whether you have the packages required to complete this module and installs them for you in case some are missing.
 
@@ -83,7 +67,7 @@ suppressWarnings(if(!require("pacman")) install.packages("pacman"))
 
 pacman::p_load('tidyverse', 'tidymodels', 'ranger',
                'vip', 'skimr', 'here','palmerpenguins', 'kernlab',
-               'janitor', 'paletteer', 'nnet')
+               'janitor', 'paletteer', 'nnet', 'doParallel')
 ```
 
 ## 1. Binary classification
