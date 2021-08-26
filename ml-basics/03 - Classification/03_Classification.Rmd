@@ -26,7 +26,7 @@ library(kernlab)
 
 ```
 
-## Buckle up 👨‍🚀
+## Buckle up 🚀
 
 In this learning path, we'll learn how to create Machine learning models using `R` 😊. Machine learning is the foundation for predictive modeling and artificial intelligence. We'll learn the core principles of machine learning and how to use common tools and frameworks to train, evaluate, and use machine learning models.
 
@@ -831,7 +831,7 @@ Now that we have a set of training features and corresponding training labels, w
 
 `parsnip::multinom_reg()` defines a model that uses linear predictors to predict multiclass data using the multinomial distribution.
 
-Let's fit Multinomial regression via [nnet](https://cran.r-project.org/web/packages/nnet/nnet.pdf) package. This model usually has 1 tuning hyperparameter, `penalty`, which describes the amount of regularization. This is used to counteract any bias in the sample, and help the model generalize well by avoiding *overfitting* the model to the training data. We can of course tune this parameter like we will later on in this lesson, but for now, let's choose an arbitrary value of `1`
+Let's fit Multinomial regression via [nnet](https://cran.r-project.org/web/packages/nnet/nnet.pdf) package. This model usually has 1 tuning hyperparameter, `penalty`, which describes the amount of regularization. This is used to counteract any bias in the sample, and help the model generalize well by avoiding *overfitting* the model to the training data. We can of course tune this parameter, like we will later on in this lesson, but for now, let's choose an arbitrary value of `1`
 
 ```{r mr_spec}
 # Specify a multinomial regression via nnet
@@ -1137,11 +1137,11 @@ Good job! A working model 🐧🐧!
 
 ## 7. Summary
 
-We need to *chill* out, right? 😅 We hope you had a flippin' good time!
+We need to *chill*, right? 😅 We hope you had a flippin' good time!
 
-In this module, you learned how classification can be used to create a machine learning model that predicts categories, or *classes*. You then used the amazing **Tidymodels** framework in `R` to train and evaluate a regression model using different algorithms, do some data preprocessing, tuned some hyperparameters and made better predictions.
+In this module, you learned how classification can be used to create a machine learning model that predicts categories, or *classes*. You then used the amazing **Tidymodels** framework in `R` to train and evaluate a classification model using different algorithms, do some data preprocessing, tuned some hyperparameters and made better predictions.
 
-While `Tidymodels` and `scikit-learn` (Python) are popular framework for writing code to train regression models, you can also create machine learning solutions for regression using the graphical tools in Microsoft Azure Machine Learning. You can learn more about no-code development of regression models using Azure Machine Learning in [Create a classification model with Azure Machine Learning designer](https://docs.microsoft.com/en-us/learn/modules/create-classification-model-azure-machine-learning-designer/) module.
+While `Tidymodels` and `scikit-learn` (Python) are popular framework for writing code to train classification models, you can also create machine learning solutions for classification using the graphical tools in Microsoft Azure Machine Learning. You can learn more about no-code development of classification models using Azure Machine Learning in [Create a classification model with Azure Machine Learning designer](https://docs.microsoft.com/en-us/learn/modules/create-classification-model-azure-machine-learning-designer/) module.
 
 #### **Challenge: Predict Real Estate Prices**
 
@@ -1151,11 +1151,11 @@ Feel like challenging yourself to train a classification model? Try the challeng
 
 `Allison Horst` for creating the amazing illustrations that make R more welcoming and engaging. Find more illustrations at her [gallery](https://www.google.com/url?q=https://github.com/allisonhorst/stats-illustrations&sa=D&source=editors&ust=1626380772530000&usg=AOvVaw3zcfyCizFQZpkSLzxiiQEM).
 
-`Bethany`, *Gold Microsoft Learn Student Ambassador*, for the valuable feedback and suggestions.
+`Bethany`, *Gold Microsoft Learn Student Ambassador*, for her valuable feedback and suggestions.
 
 #### FURTHER READING
 
--   Gareth James, Daniela Witten, Trevor Hastie, Robert Tibshirani. [*An introduction to statistical learning : with applications in R*](https://www.statlearning.com/)*.* Corresponding Tidymodels labs byEmil Hvitfeldt can be found [*here*](https://emilhvitfeldt.github.io/ISLR-tidymodels-labs/index.html)*.*
+-   Gareth James, Daniela Witten, Trevor Hastie, Robert Tibshirani. [*An introduction to statistical learning : with applications in R*](https://www.statlearning.com/)*.* Corresponding Tidymodels labs by Emil Hvitfeldt can be found [*here*](https://emilhvitfeldt.github.io/ISLR-tidymodels-labs/index.html)*.*
 
 -   Max Kuhn and Julia Silge, [*Tidy Modeling with R*](https://www.tmwr.org/)*.*
 
@@ -1165,7 +1165,7 @@ Feel like challenging yourself to train a classification model? Try the challeng
 
 -   Jorge Cimentada, [*Machine Learning for Social Scientists*](https://cimentadaj.github.io/ml_socsci/)*.*
 
--   Tidy models [reference website](https://www.tidymodels.org/start/).
+-   Tidymodels [reference website](https://www.tidymodels.org/start/).
 
 -   H. Wickham and G. Grolemund, [*R for Data Science: Visualize, Model, Transform, Tidy, and Import Data*](https://r4ds.had.co.nz/).
 
