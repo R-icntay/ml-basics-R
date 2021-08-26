@@ -3,7 +3,7 @@ The following R packages will be required in this module:
 library(rmarkdown) # Knits code and text
 library(tidyverse) # Collection of R packages designed for data science
 library(tidymodels) # Collection of packages for modelling and machine learning
-library(glue)0 # Formatting strings
+library(glue) # Formatting strings
 library(lubridate) # Parsing and manipulating dates
 library(kableExtra) # Generating tables in R
 library(patchwork) # Combines multiple plots

@@ -1,0 +1,20 @@
+The following R packages will be required in this module:
+
+library(rmarkdown) # Knits code and text
+library(tidyverse) # Collection of R packages designed for data science
+library(tidymodels) # Collection of packages for modelling and machine learning
+library(glmnet) # Implementing generalized linear models
+library(ranger) # Implementing random forest models
+library(here) # A simpler way to find your files
+library(paletteer) # Cool color palettes
+library(vip) # Making variable importance plots
+library(palmerpenguins) # For palmer penguins data
+library(nnet) # Implementing multinomial regression models
+library(skimr) # Doing quick EDA
+library(kernlab) # Fitting SVMs
+
+
+
+One can have them installed as:
+
+install.packages(c('tidyverse', 'tidymodels', 'ranger', 'vip', 'palmerpenguins', 'skimr', 'paletteer', 'nnet', 'here', 'glmnet'))
