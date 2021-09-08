@@ -1,0 +1,16 @@
+The following R packages will be required in this module:
+
+library(rmarkdown) # Knits code and text
+library(tidyverse) # Collection of R packages designed for data science
+library(tidymodels) # Collection of packages for modelling and machine learning
+library(plotly) # Making interactive plots
+library(factoextra) # Extracting and visualizing the output of clustering analysis
+library(cluster) # Provides clustering algorithms such as AGNES and DIANA
+library(skimr) # Doing quick EDA
+
+
+
+
+One can have them installed as:
+
+install.packages(c('tidyverse', 'tidymodels', 'skimr', 'here', 'plotly', 'factoextra', 'cluster'))
