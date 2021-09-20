@@ -1,0 +1,203 @@
+---
+title: "Train and Evaluate Clustering Models using Tidymodels and friends"
+output:
+  html_document:
+    css: style_7.css
+    df_print: paged
+    theme: flatly
+    highlight: breezedark
+    toc_float: yes
+    code_download: yes
+    word_document: null
+    toc: yes
+#always_allow_html: yes
+---
+
+## **Exercise - Train and evaluate a clustering model using Tidymodels and friends**
+
+### Clustering - Introduction
+
+In contrast to *supervised* machine learning, *unsupervised* learning is used when there is no "ground truth" from which to train and validate label predictions. The most common form of unsupervised learning is *clustering*, which is simllar conceptually to *classification*, except that the the training data does not include known values for the class label to be predicted. Clustering works by separating the training cases based on similarities that can be determined from their feature values. Think of it this way; the numeric features of a given entity can be thought of as vector coordinates that define the entity's position in n-dimensional space. What a clustering model seeks to do is to identify groups, or *clusters*, of entities that are close to one another while being separated from other clusters.
+
+For example, let's take a look at a dataset that contains measurements of different species of wheat seed.
+
+> **Citation**: The seeds dataset used in the this exercise was originally published by the Institute of Agrophysics of the Polish Academy of Sciences in Lublin, and can be downloaded from the UCI dataset repository (Dua, D. and Graff, C. (2019). UCI Machine Learning Repository [<http://archive.ics.uci.edu/ml>]. Irvine, CA: University of California, School of Information and Computer Science).
+
+```{r read_url, message=F, warning=F}
+# Load the core tidyverse and make it available in your current R session
+library(tidyverse)
+
+# Read the csv file into a tibble
+seeds <- read_csv(file = "https://raw.githubusercontent.com/MicrosoftDocs/ml-basics/master/data/seeds.csv")
+
+# Print the first 10 rows of the data
+seeds %>% 
+  slice_head(n = 5)
+```
+
+Sometimes, we may want some little more information on our data. We can have a look at the `data`, `its structure` and the `data type` of its features by using the [*glimpse()*](https://pillar.r-lib.org/reference/glimpse.html) function as below:
+
+```{r}
+# Explore dimension and type of columns
+seeds %>% 
+  glimpse()
+```
+
+While at it, let's use `skimr::skim()` to take a look at the summary statistics for the data
+
+```{r summary_stats}
+library(skimr)
+
+# Obtain Summary statistics
+seeds %>% 
+  skim()
+```
+
+Take a moment and go through the quick data exploration we just performed. Do we have any missing values? What's the dimension of our data (rows and columns)? What are the different column types? How are the values in our columns distributed?
+
+For this module, we'll work with the first 6 `feature` columns. For **plotting** purposes, let's encode the *label* column as categorical. Tidymodels provides a neat way of excluding this variable when fitting a model to our data. Remember, we are dealing with unsupervised learning - which does not make use of previously known *label* values to train a model.
+
+```{r select}
+# Narrow down to desired features
+seeds_select <- seeds %>% 
+  select(!groove_length) %>% 
+  mutate(species = factor(species))
+
+# View first 5 rows of the data
+seeds_select %>% 
+  slice_head(n = 5)
+
+```
+
+As you can see, we now have six data points (or *features*) for each instance (*observation*) of a seed's species. So you could interpret these as coordinates that describe each seed's location in six-dimensional space.
+
+Now, of course six-dimensional space is difficult to visualise in a three-dimensional world, or on a two-dimensional plot; so we'll take advantage of a mathematical technique called *`Principal Component Analysis`* (PCA) to analyze the relationships between the features and summarize each observation as coordinates for two principal components - in other words, we'll translate the six-dimensional feature values into two-dimensional coordinates.
+
+> *`Principal Component Analysis`* (PCA) is a dimension reduction method that aims at reducing the feature space, such that, most of the information or variability in the data set can be explained using fewer uncorrelated features.
+
+Let's see this in action by creating a specification of a `recipe` that will estimate the *principal components* based on our six variables. We'll then `prep` and`bake` the recipe to apply the computations.
+
+> PCA works well when the variables are normalized (`centered` and `scaled`)
+
+```{r pca_prep, message=F, warning=F}
+# Load the core tidymodels and make it available in your current R session
+library(tidymodels)
+
+
+# Specify a recipe for pca
+pca_rec <- recipe(~ ., data = seeds_select) %>% 
+  update_role(species, new_role = "ID") %>% 
+  step_normalize(all_predictors()) %>% 
+  step_pca(all_predictors(), num_comp = 2, id = "pca")
+
+# Print out recipe
+pca_rec
+
+```
+
+Compared to supervised learning techniques, we have no `outcome` variable in this recipe.
+
+By updating the role of the `species` column to `ID`, this tells the recipe to keep the variable but not use it as either an outcome or predictor.
+
+By calling `prep()` which estimates the statistics required by PCA and applying them to `seeds_select` using `bake(new_data = NULL)`, we can get the fitted PC transformation of our features.
+
+```{r bake}
+# Estimate required statistcs 
+pca_estimates <- prep(pca_rec)
+
+# Return preprocessed data using bake
+features_2d <- pca_estimates %>% 
+  bake(new_data = NULL)
+
+# Print baked data set
+features_2d %>% 
+  slice_head(n = 5)
+```
+
+These two components capture the maximum amount of information (i.e. variance) in the original variables. From the output of our prepped recipe `pca_estimates`, we can examine how much variance each component accounts for:
+
+```{r variance}
+# Examine how much variance each PC accounts for
+pca_estimates %>% 
+  tidy(id = "pca", type = "variance") %>% 
+  filter(str_detect(terms, "percent"))
+
+
+theme_set(theme_light())
+# Plot how much variance each PC accounts for
+pca_estimates %>% 
+  tidy(id = "pca", type = "variance") %>% 
+  filter(terms == "percent variance") %>% 
+  ggplot(mapping = aes(x = component, y = value)) +
+  geom_col(fill = "midnightblue", alpha = 0.7) +
+  ylab("% of total variance")
+```
+
+This output tibbles and plots shows how well each principal component is explaining the original six variables. For example, the first principal component (PC1) explains about `72%` of the variance of the six variables. The second principal component explains an additional `16.97%`, giving a cumulative percent variance of `89.11%`. This is certainly better. It means that the first two variables seem to have some power in summarizing the original six variables.
+
+Naturally, the first PC (PC1) captures the most variance followed by PC2, then PC3, etc.
+
+Now that we have the data points translated to two dimensions PC1 and PC2, we can visualize them in a plot:
+
+```{r pca_plot}
+# Visualize PC scores
+features_2d %>% 
+  ggplot(mapping = aes(x = PC1, y = PC2)) +
+  geom_point(size = 2, color = "dodgerblue3")
+
+```
+
+Hopefully you can see at least two, arguably three, reasonably distinct groups of data points; but here lies one of the fundamental problems with clustering - without known class labels, how do you know how many clusters to separate your data into?
+
+One way we can try to find out is to use a data sample to create a series of clustering models with an incrementing number of clusters, and measure how tightly the data points are grouped within each cluster. A metric often used to measure this tightness is the *within cluster sum of squares* (WCSS), with lower values meaning that the data points are closer. You can then plot the WCSS for each model.
+
+We'll use the built-in `kmeans()` function, which accepts a data frame with all numeric columns as it's primary argument to perform clustering - means we'll have to drop the *species* column. For clustering, it is recommended that the data have the same scale. We can use the recipes package to perform these transformations.
+
+```{r clustering}
+# Drop target column and normalize data
+seeds_features<- recipe(~ ., data = seeds_select) %>% 
+  step_rm(species) %>% 
+  step_normalize(all_predictors()) %>% 
+  prep() %>% 
+  bake(new_data = NULL)
+
+# Print out data
+seeds_features %>% 
+  slice_head(n = 5)
+```
+
+Now, let's explore the WCSS of different numbers of clusters.
+
+We'll get to use `map()` from the [purrr](https://purrr.tidyverse.org/) package to apply functions to each element in list.
+
+```{r WCSS_plot}
+set.seed(2056)
+# Create 10 models with 1 to 10 clusters
+kclusts <- tibble(k = 1:10) %>% 
+  mutate(
+    model = map(k, ~ kmeans(x = seeds_features, centers = .x,
+                            nstart = 20)),
+    glanced = map(model, glance)) %>% 
+  unnest(cols = c(glanced))
+
+
+
+# Plot Total within-cluster sum of squares (tot.withinss)
+kclusts %>% 
+  ggplot(mapping = aes(x = k, y = tot.withinss)) +
+  geom_line(size = 1.2, alpha = 0.5, color = "dodgerblue3") +
+  geom_point(size = 2, color = "dodgerblue3")
+```
+
+The plot shows a large reduction in WCSS (so greater *tightness*) as the number of clusters increases from one to two, and a further noticable reduction from two to three clusters. After that, the reduction is less pronounced, resulting in an `elbow` 💪in the chart at around three clusters. This is a good indication that there are two to three reasonably well separated clusters of data points.
+
+### **Summary**
+
+Here we looked at what clustering means, and how to determine whether clustering might be appropriate for your data. In the next notebook, we will look at two ways of labeling the data automatically.
+
+```{r include=FALSE}
+library(here)
+library(rmd2jupyter)
+rmd2jupyter("04_Clustering_Exercise_01.Rmd")
+
+```

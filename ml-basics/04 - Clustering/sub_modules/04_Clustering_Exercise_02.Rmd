@@ -1,0 +1,308 @@
+---
+title: "Train and Evaluate Clustering Models using Tidymodels and friends"
+output:
+  html_document:
+    css: style_7.css
+    df_print: paged
+    theme: flatly
+    highlight: breezedark
+    toc_float: yes
+    code_download: yes
+    word_document: null
+    toc: yes
+#always_allow_html: yes
+---
+
+
+
+## **Exercise - Train and evaluate advanced clustering models**
+
+### Clustering: K-Means and Hierarchical
+
+In the last notebook, we learned that data can be broken into clusters and learned how to estimate the number of clusters in our data points by creating a series of clustering models with an incrementing number of clusters, and measuring the WCSS within each cluster. In this notebook, we will further explore K-Means clustering and also take a look at Hierarchical clustering.
+
+To get started, run the cell below to load our data
+
+> **Citation**: The seeds dataset used in the this exercise was originally published by the Institute of Agrophysics of the Polish Academy of Sciences in Lublin, and can be downloaded from the UCI dataset repository (Dua, D. and Graff, C. (2019). UCI Machine Learning Repository [<http://archive.ics.uci.edu/ml>]. Irvine, CA: University of California, School of Information and Computer Science).
+
+```{r message=F, warning=F}
+# Load the core tidyverse and tidymodels
+library(tidyverse)
+library(tidymodels)
+
+# Read the csv file into a tibble
+seeds <- read_csv(file = "https://raw.githubusercontent.com/MicrosoftDocs/ml-basics/master/data/seeds.csv")
+
+# Narrow down to desired features
+seeds_select <- seeds %>% 
+  select(!groove_length) %>% 
+  mutate(species = factor(species))
+
+# Specify a recipe for PCA and extract 2 PCA components
+features_2d <- recipe(~ ., data = seeds_select) %>% 
+  update_role(species, new_role = "ID") %>% 
+  step_normalize(all_predictors()) %>% 
+  step_pca(all_predictors(), num_comp = 2, id = "pca") %>% 
+  prep() %>% 
+  bake(new_data = NULL)
+
+# Preprocess and obtain data for clustering
+# Drop target column and normalize data
+seeds_features<- recipe(~ ., data = seeds_select) %>% 
+  step_rm(species) %>% 
+  step_normalize(all_predictors()) %>% 
+  prep() %>% 
+  bake(new_data = NULL)
+
+
+```
+
+### K-Means Clustering
+
+The algorithm we used to create our test clusters is *K-Means*. This is a commonly used clustering algorithm that separates a dataset into *K* clusters of equal variance. The number of clusters, *K*, is user defined. The basic algorithm has the following steps:
+
+1.  A set of K centroids are randomly chosen.
+
+2.  Clusters are formed by assigning the data points to their closest centroid.
+
+3.  The means of each cluster is computed and the centroid is moved to the mean.
+
+4.  Steps 2 and 3 are repeated until a stopping criteria is met. Typically, the algorithm terminates when each new iteration results in negligable movement of centroids and the clusters become static.
+
+5.  When the clusters stop changing, the algorithm has *converged*, defining the locations of the clusters - note that the random starting point for the centroids means that re-running the algorithm could result in slightly different clusters, so training usually involves multiple iterations, reinitializing the centroids each time, and the model with the best WCSS is selected.
+
+Now, back to our previous notebok. After creating a series of clustering models with different numbers of clusters and plotting the WCSS across the clusters, we noticed a bend at around `k = 3`. This bend indicates that additional clusters beyond the third have little value and that there are two to three reasonably well separated clusters of data points.
+
+So, let's perform *K-Means* clustering specifying `k = 3` clusters and add the classifications to the data set using `augment`.
+
+```{r finalize model, message=F, warning=F}
+set.seed(2056)
+# Fit and predict clusters with k = 3
+final_kmeans <- kmeans(seeds_features, centers = 3, nstart = 100, iter.max = 1000)
+
+# Add cluster prediction to the data set
+results_kmeans <- augment(final_kmeans, seeds_features) %>% 
+# Bind pca_data - features_2d
+  bind_cols(features_2d)
+
+results_kmeans %>% 
+  slice_head(n = 5)
+
+```
+
+Let's see those cluster assignments with the two dimensional data points. We'll add some touch of interactivity using the [plotly package](https://plotly.com/r/getting-started/), so feel free to hover.
+
+```{r cluster_plot1, message=F, warning=F}
+library(plotly)
+# Plot km_cluster assignmnet on the PC data
+cluster_plot <- results_kmeans %>% 
+  ggplot(mapping = aes(x = PC1, y = PC2)) +
+  geom_point(aes(shape = .cluster), size = 2) +
+  scale_color_manual(values = c("darkorange","purple","cyan4"))
+
+# Make plot interactive
+ggplotly(cluster_plot)
+
+```
+
+Hopefully, the data has been separated into three distinct clusters.
+
+So what's the practical use of clustering? In some cases, you may have data that you need to group into distict clusters without knowing how many clusters there are or what they indicate. For example a marketing organization might want to separate customers into distinct segments, and then investigate how those segments exhibit different purchasing behaviors.
+
+Sometimes, clustering is used as an initial step towards creating a classification model. You start by identifying distinct groups of data points, and then assign class labels to those clusters. You can then use this labelled data to train a classification model.
+
+In the case of the seeds data, the different species of seed are already known and encoded as 0 (*Kama*), 1 (*Rosa*), or 2 (*Canadian*), so we can use these identifiers to compare the species classifications to the clusters identified by our unsupervised algorithm
+
+```{r cluster_sp, message=F, warning=F}
+# Plot km_cluster assignmnet on the PC data
+clust_spc_plot <- results_kmeans %>% 
+  ggplot(mapping = aes(x = PC1, y = PC2)) +
+  geom_point(aes(shape = .cluster, color = species), size = 2, alpha = 0.8) +
+  scale_color_manual(values = c("darkorange","purple","cyan4"))
+
+# Make plot interactive
+ggplotly(clust_spc_plot)
+```
+
+There may be some differences between the cluster assignments and class labels as shown by the different colors (species) within each cluster (shape). But the K-Means model should have done a reasonable job of clustering the observations so that seeds of the same species are generally in the same cluster. 💪
+
+### **Hierarchical Clustering**
+
+Hierarchical clustering methods make fewer distributional assumptions when compared to K-means methods. However, K-means methods are generally more scalable, sometimes very much so.
+
+Hierarchical clustering creates clusters by either a *divisive* method or *agglomerative* method. The `divisive` method is a `top down` approach starting with the entire dataset and then finding partitions in a stepwise manner. `Agglomerative clustering` is a `bottom up` approach. In this lab you will work with agglomerative clustering, commonly referred to as `AGNES` (AGglomerative NESting), which roughly works as follows:
+
+1.  The linkage distances between each of the data points is computed.
+
+2.  Points are clustered pairwise with their nearest neighbor.
+
+3.  Linkage distances between the clusters are computed.
+
+4.  Clusters are combined pairwise into larger clusters.
+
+5.  Steps 3 and 4 are repeated until all data points are in a single cluster.
+
+A fundamental question in hierarchical clustering is: *How do we measure the dissimilarity between two clusters of observations?* The linkage function/agglomeration methods can be computed in a number of ways:
+
+-   Ward's minimum variance method: Minimizes the total within-cluster variance. At each step the pair of clusters with the smallest between-cluster distance are merged. Tends to produce more compact clusters.
+
+-   Average linkage uses the mean pairwise distance between the members of the two clusters. Can vary in the compactness of the clusters it creates.
+
+-   Complete or Maximal linkage uses the maximum distance between the members of the two clusters. Tends to produce more compact clusters.
+
+Several different distance metrics are used to compute linkage functions:
+
+-   Euclidian or l2 distance is the most widely used. This is the only metric for the Ward linkage method.
+
+-   Manhattan or l1 distance is robust to outliers and has other interesting properties.
+
+-   Cosine similarity, is the dot product between the location vectors divided by the magnitudes of the vectors. Notice that this metric is a measure of similarity, whereas the other two metrics are measures of difference. Similarity can be quite useful when working with data such as images or text documents.
+
+Hierarchical clustering results can be easily visualized using an attractive tree-based representation called a *dendrogram*. Once the dendrogram has been constructed, we slice this structure horizontally to identify the clusters formed.
+
+### **Agglomerative Clustering**
+
+Let's see an example of clustering the seeds data using an agglomerative clustering algorithm.
+
+Let's see an example of clustering the seeds data using an agglomerative clustering algorithm. There are many functions available in R for hierarchical clustering.
+
+The [`hclust()`](https://rdrr.io/r/stats/hclust.html) function is one way to perform hierarchical clustering in R. It only needs one input and that is a distance matrix structure computed using distance metrics (e.g euclidean) as produced by [`dist()`](https://rdrr.io/pkg/factoextra/man/dist.html). `hclust()` also allows us to specify the agglomeration method to be used (i.e. `"complete"`, `"average"`, `"single"`, or `"ward.D"`).
+
+Great! Let's fit multiple hierarchical clustering models based on different agglomeration methods and see how the choice in agglomeration method changes the clustering.
+
+```{r hclust, message=F, warning=F}
+# For reproducibility
+set.seed(2056)
+
+# Distance between observations matrix
+d <- dist(x = seeds_features, method = "euclidean")
+
+# Hierarchical clustering using Complete Linkage
+seeds_hclust_complete <- hclust(d, method = "complete")
+
+# Hierarchical clustering using Average Linkage
+seeds_hclust_average <- hclust(d, method = "average")
+
+# Hierarchical clustering using Ward Linkage
+seeds_hclust_ward <- hclust(d, method = "ward.D2")
+```
+
+The [factoextra package](https://rpkgs.datanovia.com/factoextra/index.html) provides functions ([`fviz_dend()`](https://rdrr.io/pkg/factoextra/man/fviz_dend.html)) to visualize hierarchical clustering. Let's visualize the dendrogram representation of the clusters starting with the *Complete aggromeration* method.
+
+```{r complete_viz, message=F, warning=F}
+library(factoextra)
+
+# Visualize cluster separations
+fviz_dend(seeds_hclust_complete, main = "Complete Linkage")
+```
+
+What about Average linkage?
+
+```{r average_viz, message=F, warning=F}
+# Visualize cluster separations
+fviz_dend(seeds_hclust_average, main = "Average Linkage")
+```
+
+Lastly, the ward linkage.
+
+```{r ward_viz, message=F, warning=F}
+# Visualize cluster separations
+fviz_dend(seeds_hclust_ward, main = "Ward Linkage")
+
+```
+
+Perfect! Take a moment and analyze the nature of the clusters.
+
+We can do this mathematically by evaluating the *aggromerative coefficient (AC)*, which measures the clustering structure of the dataset- with values closer to 1 suggest a more balanced clustering structure and values closer to 0 suggest less well-formed clusters. `cluster::agnes()` allows us to compute the hierarchical clustering as well as this metric too.
+
+```{r AC, message=F, warning=F}
+library(cluster)
+#Compute ac values
+ac_metric <- list(
+  complete_ac = agnes(seeds_features, metric = "euclidean", method = "complete")$ac,
+  average_ac = agnes(seeds_features, metric = "euclidean", method = "average")$ac,
+  ward_ac = agnes(seeds_features, metric = "euclidean", method = "ward")$ac
+)
+
+ac_metric
+
+```
+
+As we explained earlier, complete and ward linkages tend to produce tight clustering of objects.
+
+Now, let's determine the optimal number of clusters. Although hierarchical clustering does not require one to pre-specify the number of clusters, one still needs to specify the number of clusters to extract. Let's use the *WCSS* method to determine the optimal number of clusters.
+
+```{r hcut, message=F, warning=F}
+# Determine and visuzalize optimal n.o of clusters
+#  hcut (for hierarchical clustering)
+fviz_nbclust(seeds_features, FUNcluster = hcut, method = "wss")
+
+```
+
+Just like in K-Means clustering, the optimal number of clusters for this data set is 3.
+
+Let's color our dendrogram according to k = 3 and observe how observations will be grouped. We'll go with the *ward* linkage method.
+
+```{r, message=F, warning=F}
+# Visualize clustering structure for 3 groups
+fviz_dend(seeds_hclust_ward, k = 3, main = "Ward Linkage")
+```
+
+Plausible enough!
+
+We can now go ahead and `cut` the hierarchical clustering model into three clusters and extract the cluster labels for each observation associated with a given cut. This is done using `cutree()`
+
+```{r cutree, message=F, warning=F}
+# Hierarchical clustering using Ward Linkage
+seeds_hclust_ward <- hclust(d, method = "ward.D2")
+
+# Group data into 3 clusters
+results_hclust <- tibble(
+  cluster_id = cutree(seeds_hclust_ward, k = 3)) %>% 
+  mutate(cluster_id = factor(cluster_id)) %>% 
+  bind_cols(features_2d)
+
+results_hclust %>% 
+  slice_head(n = 5)
+
+```
+
+We could probably do a little comparison between *K-Means* and *Hierarchical clustering* by counting the number of observations of each species in the corresponding clusters.
+
+```{r, message=F, warning=F}
+# Compare k-m and hc
+results_hclust %>% 
+  count(species, cluster_id) %>% 
+  rename(cluster_id_hclust = cluster_id, n_hclust = n) %>% 
+  bind_cols(results_kmeans %>% 
+              count(species, .cluster) %>%
+              select(!species) %>% 
+              rename(cluster_id_kmclust = .cluster, n_kmclust = n))
+            
+```
+
+Ignoring the cluster_id columns since they are arbitrary, we can see that the observations were grouped quite similarly by the two algorithms. We could of course make a confusion matrix to better visualize this, but we'll leave it at that for now.
+
+Let's wrap it up by making some plots showing how our observations were grouped into clusters.
+
+```{r hclust_clustering_plot, message=F, warning=F}
+# Plot h-cluster assignmnet on the PC data
+hclust_spc_plot <- results_hclust %>% 
+  ggplot(mapping = aes(x = PC1, y = PC2)) +
+  geom_point(aes(shape = cluster_id, color = species), size = 2, alpha = 0.8) +
+  scale_color_manual(values = c("darkorange","purple","cyan4"))
+
+# Make plot interactive
+ggplotly(hclust_spc_plot)
+```
+
+### **Summary**
+
+Here we practiced using K-means and hierarchical clustering. This unsupervised learning has the ability to take unlabelled data and identify which of these data are similar to one another.
+
+```{r include=FALSE}
+library(here)
+library(rmd2jupyter)
+rmd2jupyter("04_Clustering_Exercise_02.Rmd")
+
+```
