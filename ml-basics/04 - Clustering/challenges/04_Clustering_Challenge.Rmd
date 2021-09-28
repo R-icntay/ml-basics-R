@@ -1,0 +1,48 @@
+---
+title: 'Train and Evaluate Clustering Models using Tidymodels and friends'
+output:
+  html_document:
+    #css: style_7.css
+    df_print: paged
+    theme: flatly
+    highlight: breezedark
+    toc: yes
+    toc_float: yes
+    code_download: yes
+---
+
+## **Clustering Challenge**
+
+Clustering is an *unsupervised* machine learning technique in which you train a model to group similar entities into clusters based on their features.
+
+In this exercise, you must separate a dataset consisting of three numeric features (**A**, **B**, and **C**) into clusters.
+
+Let's begin by importing the data.
+
+```{r read_url, message=F, warning=F}
+# Load the core tidyverse and make it available in your current R session
+library(tidyverse)
+
+# Read the csv file into a tibble
+data <- read_csv(file = "https://raw.githubusercontent.com/MicrosoftDocs/ml-basics/master/challenges/data/clusters.csv")
+
+# Print the first 10 rows of the data
+data %>% 
+  slice_head(n = 10)
+```
+
+Your challenge is to identify the number of discrete clusters present in the data, and create a clustering model that separates the data into that number of clusters. You should also visualize the clusters to evaluate the level of separation achieved by your model.
+
+Add markdown and code cells as required to create your solution.
+
+> **Note**: There is no single "correct" solution. A sample solution is provided in 04 - Clustering Solution.ipynb.
+
+```{r}
+# Your clustering adventure begins here 
+```
+
+```{r include=FALSE}
+library(here)
+library(rmd2jupyter)
+rmd2jupyter("04_Clustering_Challenge.Rmd")
+```
