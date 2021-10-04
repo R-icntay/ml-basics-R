@@ -1,0 +1,225 @@
+---
+title: 'Train and Evaluate Classification Models using Tidymodels'
+output:
+  html_document:
+    df_print: paged
+    theme: flatly
+    highlight: breezedark
+    toc: yes
+    toc_float: yes
+    code_download: yes
+---
+
+## **Exercise - Train and evaluate a classification model using Tidymodels**
+
+# Classification
+
+*Supervised* machine learning techniques involve training a model to operate on a set of *features* and predict a *label* using a dataset that includes some already-known label values. You can think of this function like this, in which $y$ represents the label we want to predict and $x$ represents the vector of features the model uses to predict it.
+
+$$y = f([x_1, x_2, x_3, ...])$$
+
+*Classification* is a form of supervised machine learning in which you train a model to use the features (the $x$ values in our function) to predict a label ($y$) that calculates the probability of the observed case belonging to each of a number of possible classes, and predicting an appropriate label. The simplest form of classification is *binary* classification, in which the label is 0 or 1, representing one of two classes; for example, `True` or `False`; `Internal` or `External`; `Profitable` or `Non-Profitable`; and so on.
+
+### Binary Classification
+
+In this notebook, we will focus on an example of *binary classification*, where the model must predict a label that belongs to one of two classes. In this exercise, we'll train a binary classifier to predict whether or not a patient should be tested for diabetes based on some medical data.
+
+### Explore the data
+
+The first step in any machine learning project is to `explore the data` that you will use to train a model. And before we can explore the data, we must first have it in our environment, right?
+
+So, let's begin by importing a CSV file of patent data into a `tibble` (a modern a modern reimagining of the data frame):
+
+> **Citation**: The diabetes dataset used in this exercise is based on data originally collected by the National Institute of Diabetes and Digestive and Kidney Diseases.
+
+```{r read_url, message=FALSE, warning=FALSE}
+# Load the core tidyverse and make it available in your current R session
+library(tidyverse)
+
+
+# Read the csv file into a tibble
+diabetes <- read_csv(file = "https://raw.githubusercontent.com/MicrosoftDocs/ml-basics/master/data/diabetes.csv")
+
+
+# Print the first 10 rows of the data
+diabetes %>% 
+  slice_head(n = 10)
+```
+
+Sometimes, we may want some little more information on our data. We can have a look at the `data`, `its structure` and the `data type` of its features by using the [*glimpse()*](https://pillar.r-lib.org/reference/glimpse.html) function as below:
+
+```{r}
+# Take a quick glance at the data
+diabetes %>% 
+  glimpse()
+```
+
+This data consists of diagnostic information about some patients who have been tested for diabetes. Note that the final column in the dataset (`Diabetic`) contains the value *`0`* for patients who tested `negative` for diabetes, and *`1`* for patients who tested positive. This is the label that we will train our model to predict; most of the other columns (**Pregnancies**, **PlasmaGlucose**, **DiastolicBloodPressure**, **BMI** and so on) are the features we will use to predict the **Diabetic** label.
+
+Let's kick off our adventure by reformatting the data to make it easier for a model to use effectively. For now, let's drop the PatientID column, encode the Diabetic column as a categorical variable, and make the column names a bit friend_lieR:
+
+```{r reformat, message=F, warning=F}
+# Load the janitor package for cleaning data
+library(janitor)
+
+# Clean data a bit
+diabetes_select <- diabetes %>%
+  # Encode Diabetic as category
+  mutate(Diabetic = factor(Diabetic, levels = c("1","0"))) %>% 
+  # Drop PatientID column
+  select(-PatientID) %>% 
+  # Clean column names
+  clean_names()
+
+
+# View data set
+diabetes_select %>% 
+  slice_head(n = 10)
+```
+
+The goal of this exploration is to try to understand the `relationships` between its attributes; in particular, any apparent correlation between the *features* and the *label* your model will try to predict. One way of doing this is by using data visualization.
+
+Now let's compare the feature distributions for each label value. We'll begin by formatting the data to a *long* format to make it somewhat easier to make multiple `facets`.
+
+```{r long_format, message=F, warning=F}
+# Pivot data to a long format
+diabetes_select_long <- diabetes_select %>% 
+    pivot_longer(!diabetic, names_to = "features", values_to = "values")
+
+
+# Print the first 10 rows
+diabetes_select_long %>% 
+  slice_head(n = 10)
+```
+
+Perfect! Now, let's make some plots.
+
+```{r plot_long, message=F, warning=F}
+theme_set(theme_light())
+# Make a box plot for each predictor feature
+diabetes_select_long %>% 
+  ggplot(mapping = aes(x = diabetic, y = values, fill = features)) +
+  geom_boxplot() + 
+  facet_wrap(~ features, scales = "free", ncol = 4) +
+  scale_color_viridis_d(option = "plasma", end = .7) +
+  theme(legend.position = "none")
+
+```
+
+Amazing🤩! For some of the features, there's a noticeable difference in the distribution for each label value. In particular, `Pregnancies` and `Age` show markedly different distributions for diabetic patients than for non-diabetic patients. These features may help predict whether or not a patient is diabetic.
+
+### Split the data
+
+Our dataset includes known values for the label, so we can use this to train a classifier so that it finds a statistical relationship between the features and the label value; but how will we know if our model is any good? How do we know it will predict correctly when we use it with new data that it wasn't trained with?
+
+It is best practice to hold out some of your data for **testing** in order to get a better estimate of how your models will perform on new data by comparing the predicted labels with the already known labels in the test set.
+
+Well, we can take advantage of the fact we have a large dataset with known label values, use only some of it to train the model, and hold back some to test the trained model - enabling us to compare the predicted labels with the already known labels in the test set.
+
+In R, the amazing Tidymodels framework provides a collection of packages for modeling and machine learning using **tidyverse** principles. For instance, [rsample](https://rsample.tidymodels.org/), a package in Tidymodels, provides infrastructure for efficient data splitting and resampling:
+
+-   `initial_split()`: specifies how data will be split into a training and testing set
+
+-   `training()` and `testing()` functions extract the data in each split
+
+use `?initial_split()` for more details.
+
+> Here is a great place to get started with Tidymodels: [Get Started](https://www.tidymodels.org/start/)
+
+```{r plot, message=F, warning=F}
+# Load the Tidymodels packages
+library(tidymodels)
+
+
+
+# Split data into 70% for training and 30% for testing
+set.seed(2056)
+diabetes_split <- diabetes_select %>% 
+  initial_split(prop = 0.70)
+
+
+# Extract the data in each split
+diabetes_train <- training(diabetes_split)
+diabetes_test <- testing(diabetes_split)
+
+
+# Print the number of cases in each split
+cat("Training cases: ", nrow(diabetes_train), "\n",
+    "Test cases: ", nrow(diabetes_test), sep = "")
+
+
+# Print out the first 5 rows of the training set
+diabetes_train %>% 
+  slice_head(n = 5)
+
+
+```
+
+### Train and Evaluate a Binary Classification Model
+
+OK, now we're ready to train our model by fitting the training features to the training labels (`diabetic`). There are various algorithms we can use to train the model. In this example, we'll use *`Logistic Regression`*, which (despite its name) is a well-established algorithm for classification. Logistic regression is a binary classification algorithm, meaning it predicts 2 categories.
+
+There are quite a number of ways to fit a logistic regression model in Tidymodels. See `?logistic_reg()` For now, let's fit a logistic regression model via the default `stats::glm()` engine.
+
+```{r log_glm, message=F, warning=F}
+# Make a model specifcation
+logreg_spec <- logistic_reg() %>% 
+  set_engine("glm") %>% 
+  set_mode("classification")
+
+
+# Print the model specification
+logreg_spec
+
+```
+
+After a model has been *specified*, the model can be `estimated` or `trained` using the [`fit()`](https://tidymodels.github.io/parsnip/reference/fit.html) function, typically using a symbolic description of the model (a formula) and some data.
+
+```{r log_glm_fit, message=F, warning=F}
+# Train a logistic regression model
+logreg_fit <- logreg_spec %>% 
+  fit(diabetic ~ ., data = diabetes_train)
+
+
+# Print the model object
+logreg_fit
+
+```
+
+The model print out shows the coefficients learned during training.
+
+Now we've trained the model using the training data, we can use the test data we held back to evaluate how well it predicts using [parsnip::predict()](https://parsnip.tidymodels.org/reference/predict.model_fit.html). Let's start by using the model to predict labels for our test set, and compare the predicted labels to the known labels:
+
+```{r model_eval,message=F,warning=F}
+# Make predictions then bind them to the test set
+results <- diabetes_test %>% select(diabetic) %>% 
+  bind_cols(logreg_fit %>% predict(new_data = diabetes_test))
+
+
+# Compare predictions
+results %>% 
+  slice_head(n = 10)
+```
+
+Comparing each prediction with its corresponding "ground truth" actual value isn't a very efficient way to determine how well the model is predicting. Fortunately, Tidymodels has a few more tricks up its sleeve: [`yardstick`](https://yardstick.tidymodels.org/) - a package used to measure the effectiveness of models using performance metrics.
+
+The most obvious thing you might want to do is to check the *accuracy* of the predictions - in simple terms, what proportion of the labels did the model predict correctly?
+
+`yardstick::accuracy()` does just that!
+
+```{r acc,message=F,warning=F}
+# Calculate accuracy: proportion of data predicted correctly
+accuracy(data = results, truth = diabetic, estimate = .pred_class)
+```
+
+The accuracy is returned as a decimal value - a value of 1.0 would mean that the model got 100% of the predictions right; while an accuracy of 0.0 is, well, pretty useless 😐!
+
+### **Summary**
+
+Here we prepared our data by splitting it into test and train datasets, and applied logistic regression - a way of applying binary labels to our data. Our model was able to predict whether patients had diabetes with what appears like reasonable accuracy. But is this good enough? In the next notebook we will look at alternatives to accuracy that can be much more useful in machine learning.
+
+```{r include=FALSE}
+library(here)
+library(rmd2jupyter)
+rmd2jupyter("03_Classification_Exercise_01.Rmd")
+```
