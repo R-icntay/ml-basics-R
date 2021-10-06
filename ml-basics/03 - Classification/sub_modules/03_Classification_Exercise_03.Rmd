@@ -1,0 +1,500 @@
+---
+title: 'Train and Evaluate Classification Models using Tidymodels'
+output:
+  html_document:
+    df_print: paged
+    theme: flatly
+    highlight: breezedark
+    toc: yes
+    toc_float: yes
+    code_download: yes
+---
+
+## **Exercise - Train and evaluate multiclass classification models**
+
+Binary classification techniques work well when the data observations belong to one of two classes or categories, such as `True` or `False`. When the data can be categorized into `more than two classes`, you must use a `multiclass classification algorithm`.
+
+Multiclass classification can be thought of as a `combination` of `multiple binary classifiers`. There are two ways in which you approach the problem:
+
+-   **One vs Rest (OVR)**, in which a classifier is created for each possible class value, with a positive outcome for cases where the prediction is *this* class, and negative predictions for cases where the prediction is any other class. A classification problem with four possible shape classes (*square*, *circle*, *triangle*, *hexagon*) would require four classifiers that predict:
+
+    -   *square* or not
+
+    -   *circle* or not
+
+    -   *triangle* or not
+
+    -   *hexagon* or not
+
+-   **One vs One (OVO)**, in which a classifier for each possible pair of classes is created. The classification problem with four shape classes would require the following binary classifiers:
+
+    -   *square* or *circle*
+
+    -   *square* or *triangle*
+
+    -   *square* or *hexagon*
+
+    -   *circle* or *triangle*
+
+    -   *circle* or *hexagon*
+
+    -   *triangle* or *hexagon*
+
+In both approaches, the overall model that combines the classifiers generates a vector of predictions in which the probabilities generated from the individual binary classifiers are used to determine which class to predict.
+
+Fortunately, in most machine learning frameworks, including Tidymodels, implementing a multiclass classification model is not significantly more complex than binary classification.
+
+### Meet the data
+
+In this sections, we'll build a multiclass classifier for classifying penguins!
+
+The `palmerpenguins` data contains size measurements for three penguin species observed on three islands in the Palmer Archipelago, Antarctica.
+
+> These data were collected from 2007 - 2009 by Dr. Kristen Gorman with the [Palmer Station Long Term Ecological Research Program](https://pal.lternet.edu/), part of the [US Long Term Ecological Research Network](https://lternet.edu/). The data were imported directly from the [Environmental Data Initiative](https://environmentaldatainitiative.org/) (EDI) Data Portal, and are available for use by CC0 license ("No Rights Reserved") in accordance with the [Palmer Station Data Policy](https://pal.lternet.edu/data/policies).
+
+In R, the package `palmerpenguins` by [Allison Marie Horst and Alison Presmanes Hill and Kristen B Gorman](https://allisonhorst.github.io/palmerpenguins/articles/intro.html) provides us with data related to these adorable creatures.
+
+The corresponding csv data used in the Python tutorial can be found [here](https://github.com/MicrosoftDocs/ml-basics/tree/master/data).
+
+Care for a pun?
+
+    What is a penguin’s favorite movie?
+
+    Frozen ❄️👧.
+
+With that, let's get started exploring some penguins 🐧🐧!
+
+### Explore the data
+
+```{r penguins}
+# Load the required packages and make them available in your current R session
+suppressPackageStartupMessages({
+  library(tidyverse)
+  library(palmerpenguins)
+  library(tidymodels)
+})
+
+# Take a peek into the data
+glimpse(penguins)
+
+```
+
+The data contains the following columns:
+
+-   **species:** a factor denoting the penguin species (`Adelie`, `Chinstrap`, or `Gentoo`)
+
+-   **island:** a factor denoting the island (in Palmer Archipelago, Antarctica) where observed
+
+-   **bill_length_mm (aka culmen_length):** a number denoting length of the dorsal ridge of penguin bill (millimeters)
+
+-   **bill_depth_mm (aka culmen_depth):** a number denoting the depth of the penguin bill (millimeters)
+
+-   **flipper_length_mm:** an integer denoting penguin flipper length (millimeters)
+
+-   **body_mass_g:** an integer denoting penguin body mass (grams)
+
+-   **sex:** a factor denoting penguin sex (male, female)
+
+-   **year:** an integer denoting the study year (2007, 2008, or 2009)
+
+The **species** column containing penguin species `Adelie`, `Chinstrap`, or `Gentoo`, is the label we want to train a model to predict.
+
+The corresponding [Python learning module](https://docs.microsoft.com/en-us/learn/modules/train-evaluate-classification-models/) used a data set with the following variables: **bill_length_mm**, **bill_depth_mm**, **flipper_length_mm**, **body_mass_g**, **species**.
+
+Let's narrow down to those and make some summary statistics while at it. The [skimr package](https://cran.r-project.org/web/packages/skimr/vignettes/skimr.html) provides a strong set of summary statistics that are generated for a variety of different data types.
+
+```{r skimr}
+# Load the skimr column
+library(skimr)
+
+# Select desired columns
+penguins_select <- penguins %>% 
+  select(c(bill_length_mm, bill_depth_mm, flipper_length_mm,
+           body_mass_g, species))
+
+# Do some summary statistics
+penguins_select %>% 
+  skim()
+```
+
+From the neat summary provided by skimr, we can see that each our predictor columns contains missing 2 values while our label/outcome column contains none.
+
+Let's dig a little deeper and filter the rows that contain missing values.
+
+```{r missing_rows}
+penguins_select %>% 
+  filter(if_any(everything(), is.na))
+
+```
+
+There are two rows that contain no feature values at all (`NA` stands for Not Available ), so these won't be useful in training a model. Let's discard them from the dataset.
+
+```{r drop_na}
+# Drop rows containing missing values
+penguins_select <- penguins_select %>% 
+  drop_na()
+
+# Confirm there are no missing values
+penguins_select %>% 
+  anyNA()
+
+# Proportion of each species in the data
+penguins_select %>% 
+  count(species)
+
+```
+
+Now that we've dealt with the missing values, let's explore how the features relate to the label by creating some box charts.
+
+```{r box_plt_penguins}
+# Load the paletteer package
+library(paletteer)
+
+# Pivot data to a long format
+penguins_select_long <- penguins_select %>% 
+  pivot_longer(!species, names_to = "predictors", values_to = "values")
+
+# Make box plots
+theme_set(theme_light())
+penguins_select_long %>%
+  ggplot(mapping = aes(x = species, y = values, fill = predictors)) +
+  geom_boxplot() +
+  facet_wrap(~predictors, scales = "free") +
+  scale_fill_paletteer_d("nbapalettes::supersonics_holiday") +
+  theme(legend.position = "none")
+  
+```
+
+From the box plots, it looks like species `Adelie` and `Chinstrap` have similar data profiles for bill_depth, flipper_length, and body_mass, but Chinstraps tend to have longer bill_length. `Gentoo` tends to have fairly clearly differentiated features from the others; which should help us train a good classification model.
+
+### Prepare the data
+
+Just as for binary classification, before training the model, we need to split the data into subsets for training and validation. We'll also apply a `stratification` technique when splitting the data to `maintain the proportion of each label value` in the training and validation datasets.
+
+```{r penguin_split}
+# For reproducibility
+set.seed(2056)
+
+# Split data 70%-30% into training set and test set
+penguins_split <- penguins_select %>% 
+  initial_split(prop = 0.70, strata = species)
+
+# Extract data in each split
+penguins_train <- training(penguins_split)
+penguins_test <- testing(penguins_split)
+
+# Print the number of observations in each split
+cat("Training cases: ", nrow(penguins_train), "\n",
+    "Test cases: ", nrow(penguins_test), sep = "")
+```
+
+### Train and evaluate a multiclass classifier
+
+Now that we have a set of training features and corresponding training labels, we can fit a multiclass classification algorithm to the data to create a model.
+
+`parsnip::multinom_reg()` defines a model that uses linear predictors to predict multiclass data using the multinomial distribution.
+
+Let's fit Multinomial regression via [nnet](https://cran.r-project.org/web/packages/nnet/nnet.pdf) package. This model usually has 1 tuning hyperparameter, `penalty`, which describes the amount of regularization. This is used to counteract any bias in the sample, and help the model generalize well by avoiding *overfitting* the model to the training data. We can of course tune this parameter, like we will later on in this lesson, but for now, let's choose an arbitrary value of `1`
+
+```{r mr_spec}
+# Specify a multinomial regression via nnet
+multireg_spec <- multinom_reg(penalty = 1) %>% 
+  set_engine("nnet") %>% 
+  set_mode("classification")
+
+# Train a multinomial regression model without any preprocessing
+set.seed(2056)
+multireg_fit <- multireg_spec %>% 
+  fit(species ~ ., data = penguins_train)
+
+# Print the model
+multireg_fit
+
+
+```
+
+Now we can use the trained model to predict the labels for the test features, and evaluate performance:
+
+```{r penguins_eval}
+# Make predictions for the test set
+penguins_results <- penguins_test %>% select(species) %>% 
+  bind_cols(multireg_fit %>% 
+              predict(new_data = penguins_test)) %>% 
+  bind_cols(multireg_fit %>% 
+              predict(new_data = penguins_test, type = "prob"))
+
+# Print predictions
+penguins_results %>% 
+  slice_head(n = 5)
+```
+
+Now, let's look at the confusion matrix for our model
+
+```{r mr_conf}
+# Confusion matrix
+penguins_results %>% 
+  conf_mat(species, .pred_class)
+
+
+```
+
+The confusion matrix shows the intersection of predicted and actual label values for each class - in simple terms, the diagonal intersections from top-left to bottom-right indicate the number of correct predictions.
+
+When dealing with multiple classes, it's generally more intuitive to visualize this as a heat map, like this:
+
+```{r mr_conf_viz}
+update_geom_defaults(geom = "tile", new = list(color = "black", alpha = 0.7))
+# Visualize confusion matrix
+penguins_results %>% 
+  conf_mat(species, .pred_class) %>% 
+  autoplot(type = "heatmap")
+```
+
+The darker squares in the confusion matrix plot indicate high numbers of cases, and you can hopefully see a diagonal line of darker squares indicating cases where the predicted and actual label are the same.
+
+Let's now calculate summary statistics for the confusion matrix.
+
+```{r penguins_summ}
+# Statistical summaries for the confusion matrix
+conf_mat(data = penguins_results, truth = species, estimate = .pred_class) %>% 
+  summary()
+```
+
+The tibble shows the overall metrics of how well the model performs across all three classes.
+
+Let's evaluate the ROC metrics. In the case of a multiclass classification model, a single ROC curve showing true positive rate vs false positive rate is not possible. However, you can use the rates for each class in a One vs Rest (OVR) comparison to create a ROC chart for each class.
+
+```{r penguins_roc}
+# Make a ROC_CURVE
+penguins_results %>% 
+  roc_curve(species, c(.pred_Adelie, .pred_Chinstrap, .pred_Gentoo)) %>% 
+  ggplot(aes(x = 1 - specificity, y = sensitivity, color = .level)) +
+  geom_abline(lty = 2, color = "gray80", size = 0.9) +
+  geom_path(show.legend = T, alpha = 0.6, size = 1.2) +
+  coord_equal()
+```
+
+That went down well! The model did a great job in classifying the penguins.
+
+What kind of adventure would it be, if we didn't preprocess the data for modeling?
+
+### Workflows + A different algorithm
+
+Again, just like with binary classification, you can use a workflow to apply preprocessing steps to the data before fitting it to an algorithm to train a model. Let's scale the numeric features in a transformation step before training, try a different algorithm (a support vector machine) and tune some model hyperparameters, just to show that we can!
+
+`Support Vector Machines` try to find a *hyperplane* in some feature space that "best" separates the classes. Please see:
+
+-   [*Support Vector Machines*](https://bradleyboehmke.github.io/HOML/svm.html), Hands-on Machine Learning with R
+
+-   *Support Vector Machines*, [An Introduction to Statistical Learning with Applications in R](https://www.statlearning.com/)
+
+-   [Support Vector Machines under the hood](https://towardsdatascience.com/support-vector-machines-under-the-hood-c609e57a4b09)
+
+-   [SVM kernels](https://scikit-learn.org/stable/auto_examples/svm/plot_svm_kernels.html), Scikit learn
+
+We'll fit a `radial basis function` support vector machine to these data and tune the `SVM cost parameter` and the `σ parameter` in the kernel function (The margin parameter does not apply to classification models)
+
+-   A cost argument allows us to specify the cost of a violation to the margin. When the cost argument is small, then the margins will be wide and many support vectors will be on the margin or will violate the margin. This *could* make the model more robust and lead to better classification. When the cost argument is large, then the margins will be narrow and there will be few support vectors on the margin or violating the margin.
+
+-   As `σ` decreases, the fit becomes more non-linear, and the model *becomes* more flexible.
+
+Both parameters can have a profound effect on the model complexity and performance.
+
+> The radial basis kernel is extremely flexible, as such, we generally start with this kernel when fitting SVMs in practice.
+
+Parameters are marked for tuning by assigning them a value of `tune()`.
+
+Also, let's try out a new succinct way of creating workflows that minimizes a lot of piping steps.
+
+```{r tune_svm}
+# Create a model specification
+svm_spec <- svm_rbf(mode = "classification", engine = "kernlab",
+            cost = tune(), rbf_sigma = tune())
+
+
+# Create a workflow that encapsulates a recipe and a model
+svm_wflow <- recipe(species ~ ., data = penguins_train) %>% 
+  step_normalize(all_numeric_predictors()) %>% 
+  workflow(svm_spec)
+
+# Print out workflow
+svm_wflow
+```
+
+Pretty neat, right ✨?
+
+Now that we have specified what parameter to tune, we'll need to figure out a set of possible values to try out then choose the best.
+
+To do this, we'll create a grid! In this example, we'll work through a regular grid of hyperparameter values, try them out, and see what pair results in the best model performance.
+
+```{r}
+set.seed(2056)
+# Create regular grid of 6 values for each tuning parameters
+svm_grid <- grid_regular(parameters(svm_spec), levels = 6)
+
+# Print out some parameters in our grid
+svm_grid %>% 
+  slice_head(n = 10)
+```
+
+Awesome! One thing about hyperparameters is that they are not learned directly from the training set. Instead, they are estimated using `simulated data sets` created from a process called `resampling`. In our previous, we used `cross-validation` resampling method. Let's try out another resampling technique: `bootstrap resampling`.
+
+Bootstrap resampling means drawing with `replacement` from our original dataset then then fit a model on that new set that `contains some duplicates`, and evaluate the model on the `data points that were not included`.
+
+Then we do that again (default behaviour is 25 boostraps but this can be changed). Okay, let's create some simulated data sets.
+
+```{r bootstraps}
+set.seed(2056)
+# Bootstrap resampling
+penguins_bs <- bootstraps(penguins_train, times = 10)
+
+penguins_bs
+```
+
+### Model tuning via grid search.
+
+We are ready to tune! Let's use [`tune_grid()`](https://tune.tidymodels.org/reference/tune_grid.html) to fit models at all the different values we chose for each hyperparameter.
+
+```{r grid_search}
+doParallel::registerDoParallel()
+
+# Model tuning via a grid search
+set.seed(2056)
+svm_res <- tune_grid(
+  object = svm_wflow,
+  resamples = penguins_bs,
+  grid = svm_grid
+)
+```
+
+Now that we have our tuning results, we can extract the performance metrics using `collect_metrics()`:
+
+```{r collect_metrics}
+# Obtain performance metrics
+svm_res %>% 
+  collect_metrics() %>% 
+  slice_head(n = 7)
+
+```
+
+🤩Let's see if we could get more by visualizing the results:
+
+```{r}
+# Visualize tuning metrics
+svm_res %>% 
+  collect_metrics() %>% 
+  mutate(rbf_sigma = factor(rbf_sigma)) %>% 
+  ggplot(mapping = aes(x = cost, y = mean, color = rbf_sigma)) +
+  geom_line(size = 1.5, alpha = 0.7) +
+  geom_point(size = 2) +
+  facet_wrap(~.metric, scales = "free", nrow = 2) +
+  scale_x_log10(labels = scales::label_number()) +
+  scale_color_viridis_d(option = "viridis", begin = .1)
+
+```
+
+It seems that an SVM with an rbf_sigma of 1 and 0.01 really performed well across all candidate values of cost. The [`show_best()`](https://tune.tidymodels.org/reference/show_best.html) function can help us make a clearer distinction:
+
+```{r show_best}
+# Show best submodel 
+svm_res %>% 
+  show_best("accuracy")
+
+
+```
+
+Much better! Let's now use the [`select_best()`](https://tune.tidymodels.org/reference/show_best.html) function to pull out the single set of hyperparameter values in the best sub-model:
+
+```{r select_best}
+# Select best model hyperparameters
+best_svm <- svm_res %>% 
+  select_best("accuracy")
+
+best_svm
+
+```
+
+Perfect! These are the values for `rbf_sigma` and `cost` that maximize accuracy for our penguins!
+
+We can now `finalize` our workflow such that the parameters we had marked for tuning by assigning them a value of `tune()` can get updated with the values from `best_svm`
+
+```{r}
+# Finalize workflow
+final_wflow <- svm_wflow %>% 
+  finalize_workflow(best_svm)
+
+final_wflow
+  
+```
+
+That marks the end of tuning 💃!
+
+### The last fit
+
+Finally, let's fit this final model to the training data and evaluate how it would perform on new data using our test data. We can use the function [`last_fit()`](https://tune.tidymodels.org/reference/last_fit.html) with our finalized model; this function *fits* the finalized model on the full training data set and *evaluates* it on the testing data.
+
+```{r last_fit}
+# The last fit
+final_fit <- last_fit(object = final_wflow, split = penguins_split)
+
+# Collect metrics
+final_fit %>% 
+  collect_metrics()
+```
+
+Much better 🤩! You can of course go ahead and obtain the hard class and probability predictions using `collect predictions()` and you will be well on your way to computing the confusion matrix and other summaries that come with it.
+
+```{r collect_predictions}
+# Collect predictions and make confusion matrix
+final_fit %>% 
+  collect_predictions() %>% 
+  conf_mat(truth = species, estimate = .pred_class)
+```
+
+### Use the model with new data observations
+
+Now let's save our trained model so we can use it again later. Begin by extracting the *trained workflow* object from `final_fit` object.
+
+```{r save_wf}
+# Extract trained workflow
+penguins_svm_model <- final_fit %>% 
+  extract_workflow()
+
+# Save workflow
+library(here)
+saveRDS(penguins_svm_model, "penguins_svm_model.rds")
+```
+
+OK, so now we have a trained model. Let's use it to predict the class of a new penguin observation:
+
+```{r load_model}
+# Load model
+loaded_psvm_model <- readRDS("penguins_svm_model.rds") 
+
+# Create new tibble of observations
+new_obs <- tibble(
+  bill_length_mm = c(49.5, 38.2),
+  bill_depth_mm = c(18.4, 20.1),
+  flipper_length_mm = c(195, 190),
+  body_mass_g = c(3600, 3900))
+
+# Make predictions
+new_results <- new_obs %>% 
+  bind_cols(loaded_psvm_model %>% 
+              predict(new_data = new_obs))
+
+# Show predictions
+new_results
+```
+
+Good job! A working model 🐧🐧!
+
+### **Summary**
+
+Classification is one of the most common forms of machine learning, and by following the basic principles we've discussed in this notebook you should be able to train, evaluate and tune classification models with Tidymodels. It's worth spending some time investigating classification algorithms in more depth, and a good starting point is the [Tidymodels documentation](https://www.tidymodels.org/).
+
+```{r include=FALSE}
+library(here)
+library(rmd2jupyter)
+rmd2jupyter("03_Classification_Exercise_03.Rmd")
+```
