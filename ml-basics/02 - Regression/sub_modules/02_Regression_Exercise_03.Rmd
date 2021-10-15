@@ -1,0 +1,484 @@
+---
+title: 'Train and Evaluate Regression Models using Tidymodels'
+output:
+  html_document:
+    df_print: paged
+    theme: flatly
+    highlight: breezedark
+    toc: yes
+    toc_float: yes
+    code_download: yes
+---
+
+```{r setup, include=F}
+# Setup chunk to install and load required packages
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+suppressWarnings(if(!require("pacman")) install.packages("pacman"))
+
+pacman::p_load('tidyverse', 'tidymodels', 'glmnet',
+               'randomForest', 'xgboost','patchwork',
+               'paletteer', 'here', 'doParallel', 'summarytools')
+```
+
+## **Regression - Optimize and save models**
+
+In the previous notebook, we used complex regression models to look at the relationship between features of a bike rentals dataset. In this notebook, we'll see if we can improve the performance of these models even further.
+
+Let's begin by loading the bicycle sharing data as a tibble and viewing the first few rows. We'll also split our data into training and test datasets.
+
+```{r recap}
+# Load the required packages and make them available in your current R session
+suppressPackageStartupMessages({
+  library(tidyverse)
+  library(tidymodels)
+  library(lubridate)
+  library(paletteer)
+})
+
+# Import the data into the R session
+bike_data <- read_csv(file = "https://raw.githubusercontent.com/MicrosoftDocs/ml-basics/master/data/daily-bike-share.csv", show_col_types = FALSE)
+
+# Parse dates then extract days
+bike_data <- bike_data %>%
+  mutate(dteday = mdy(dteday)) %>% 
+  mutate(day = day(dteday))
+
+# Select desired features and labels
+bike_select <- bike_data %>% 
+  select(c(season, mnth, holiday, weekday, workingday, weathersit,
+           temp, atemp, hum, windspeed, rentals)) %>% 
+  mutate(across(1:6, factor))
+
+# Split 70% of the data for training and the rest for tesing
+set.seed(2056)
+bike_split <- bike_select %>% 
+  initial_split(prop = 0.7,
+  # splitting data evenly on the holiday variable
+                strata = holiday)
+
+# Extract the data in each split
+bike_train <- training(bike_split)
+bike_test <- testing(bike_split)
+
+# Specify multiple regression metrics
+eval_metrics <- metric_set(rmse, rsq)
+
+
+cat("Training Set", nrow(bike_train), "rows",
+    "\nTest Set", nrow(bike_test), "rows")
+
+```
+
+This results into the following two datasets:
+
+-   *bike_train*: subset of the dataset used to train the model.
+
+-   *bike_test*: subset of the dataset used to validate the model.
+
+Now we're ready to train a model by fitting a *boosting* ensemble algorithm, as in our last notebook. Recall that a Gradient Boosting estimator, is like a Random Forest algorithm, but instead of building them all trees independently and taking the average result, each tree is built on the outputs of the previous one in an attempt to incrementally reduce the *loss* (error) in the model.
+
+```{r xgboost,message=F,warning=F}
+# For reproducibility
+set.seed(2056)
+
+# Build an xgboost model specification
+boost_spec <- boost_tree() %>% 
+  set_engine('xgboost') %>% 
+  set_mode('regression')
+
+# Train an xgboost model 
+boost_mod <- boost_spec %>% 
+  fit(rentals ~ ., data = bike_train)
+
+# Make and bind predictions to test data a
+results <- boost_mod %>% 
+  augment(new_data = bike_test) %>% 
+  rename(predictions = .pred)
+
+# Evaluate the model
+boost_metrics <- eval_metrics(data = results,
+                                  truth = rentals,
+                                  estimate = predictions) 
+
+# Plot predicted vs actual
+boost_plt <- results %>% 
+  ggplot(mapping = aes(x = rentals, y = predictions)) +
+  geom_point(color = '#4D3161FF') +
+  # overlay regression line
+  geom_smooth(method = 'lm', color = 'black', se = F) +
+  ggtitle("Daily Bike Share Predictions") +
+  xlab("Actual Labels") +
+  ylab("Predicted Labels") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+# Return evaluations
+list(boost_metrics, boost_plt)
+
+```
+
+### Preprocess the Data using recipes
+
+We trained a model with data that was loaded straight from a source file, with only moderately successful results. In practice, it's common to perform some preprocessing of the data to make it easier for the algorithm to fit a model to it.
+
+In this section, we'll explore another tidymodels package, [recipes](https://tidymodels.github.io/recipes/), which is designed to help you preprocess your data *before* training your model. A recipe is an object that defines a series of steps for data processing.
+
+There's a huge range of preprocessing transformations you can perform to get your data ready for modeling, but we'll limit ourselves to a few common techniques:
+
+#### Scaling numeric features
+
+Normalizing numeric features so they're on the same scale prevents features with large values from producing coefficients that disproportionately affect the predictions. For example, suppose your data includes the following numeric features:
+
+|  A  |  B  |  C  |
+|:---:|:---:|:---:|
+|  3  | 480 | 65  |
+
+Normalizing these features to the same scale may result in the following values (assuming A contains values from 0 to 10, B contains values from 0 to 1000, and C contains values from 0 to 100):
+
+|  A  |  B   |  C   |
+|:---:|:----:|:----:|
+| 0.3 | 0.48 | 0.65 |
+
+There are multiple ways you can scale numeric data, such as calculating the minimum and maximum values for each column and assigning a proportional value between 0 and 1, or by using the mean and standard deviation of a normally distributed variable to maintain the same *spread* of values on a different scale.
+
+#### Encoding categorical variables
+
+This involves translating a column with categorical values into one or more numeric columns that take the place of the original.
+
+Machine learning models work best with numeric features rather than text values, so you generally need to convert categorical features into numeric representations. For example, suppose your data includes the following categorical feature.
+
+| Size |
+|:----:|
+|  S   |
+|  M   |
+|  L   |
+
+You can apply *ordinal encoding* to substitute a unique integer value for each category, like this:
+
+| Size |
+|:----:|
+|  0   |
+|  1   |
+|  2   |
+
+Another common technique is to create *`dummy`* or`indicator variables` which replace the original categorical feature with numeric columns whose values are either 1 or 0. This can be shown as:
+
+| Raw Data |  M  |  L  |
+|:--------:|:---:|:---:|
+|    S     |  0  |  0  |
+|    M     |  1  |  0  |
+|    L     |  0  |  1  |
+
+In R, the convention is to *exclude* a column for the first factor level (`S`, in this case). The reasons for this include `simplicity` and reducing `linear dependencies`. The full set of encodings can also be used for some models. This is traditionally called the "one-hot" encoding and can be achieved using the `one_hot` argument of `step_dummy()`.
+
+> Tree based models created using the xgboost engine typically require one to create dummy variables.
+
+Now, let's bike forth and create some recipes ​🔪​**🚴!**
+
+```{r recipes,message=F,warning=F}
+# Specify a recipe
+bike_recipe <- recipe(rentals ~ ., data = bike_train) %>% 
+  step_normalize(all_numeric_predictors()) %>% 
+  step_dummy(all_nominal_predictors()) 
+
+# Print out recipe
+bike_recipe
+
+
+# Summary of the recipe
+summary(bike_recipe)
+```
+
+We just created our first recipe containing an outcome and its corresponding predictors, with the numeric predictors normalized and the nominal predictors converted to a quantitative format ! Let's quickly break it down:
+
+-   The call to `recipe()` with a formula tells the recipe the *roles* of the variables (e.g., predictor, outcome) using `bike_train` data as the reference. This can be seen from the results of `summary(bike_recipe)`
+
+-   `step_normalize(all_numeric_predictors())` specifies that all numeric predictors should be normalized.
+
+-   `step_dummy(all_nominal_predictors())` specifies that all predictors that are currently factor or charactor should be converted to a quantitative format (1s/0s).
+
+Great! Now that we have a recipe, the next step would be to create a model specification. In this case, let's recreate an `xgboost` model specification.
+
+```{r xgboost_spec2,message=F,warning=F}
+# xgboost specification
+boost_spec <- boost_tree() %>% 
+  set_engine('xgboost') %>% 
+  set_mode('regression')
+```
+
+"Wait!", you'll say, "How do we combine this model specification with the data preprocessing steps from our recipe? 🤔"
+
+Well, welcome to modelling `workflows` 😊. This is what we'd call *pipelines* in *Python*.
+
+### Bundling it all together using a workflow
+
+The [**workflows**](https://workflows.tidymodels.org/) package allows the user to bind modeling and preprocessing objects together. You can then fit the entire workflow to the data, so that the model encapsulates all of the preprocessing steps as well as the algorithm.
+
+```{r boost_workflow,message=F,warning=F}
+# Create the workflow
+boost_workflow <- workflow() %>% 
+  add_recipe(bike_recipe) %>% 
+  add_model(boost_spec)
+
+# Print out workflow
+boost_workflow
+
+```
+
+The `workflow` object provides quite an informative summary of the preprocessing steps that will be done by the recipe and also the model specification. Into the bargain, a **`workflow()`** can be fit in much the same way a model can.
+
+```{r boost_workflow_fit,message=F,warning=F}
+# Train the model
+boost_workflow <- boost_workflow %>% 
+  fit(data = bike_train)
+
+boost_workflow
+```
+
+Now that we have our *fitted workflow*, how do we make some predictions? `predict()` can be used on a workflow in the same way as we used it on a model!
+
+Now, let's make some predictions on the first 6 observations of our test set.
+
+```{r boost_workflow_pred,message=F,warning=F}
+boost_workflow %>% 
+  predict(new_data = bike_test %>% dplyr::slice(1:6))
+```
+
+How convenient workflows are!
+
+So probably you may be wondering why we haven't made predictions on the whole test set, evaluated performance and created some pretty graphs. We'll get right into that, but first, let's address a more pressing issue; a boosted tree's hyperparameters:
+
+```{r boost_hyper}
+args(boost_tree)
+```
+
+Those are a lot of model arguments: `mtry`, `trees`, `min_n`, `tree_depth`, `learn_rate`, `loss_reduction`, `sample_size`, `stop_iter` 🤯🤯!
+
+Now, this begs the question:
+
+how do we know what values we should use?🤔
+
+This brings us to `model tuning`.
+
+### Tune model hyperparameters
+
+Models have parameters with unknown values that must be estimated in order to use the model for predicting. These model parameters, correctly referred to as **hyperparameters** or **tuning parameters**, cannot be learned directly from a dataset during model training. Instead of learning these kinds of hyperparameters during model training, we can *estimate* the *best values* for these by training many models on a `simulated data set` and measuring how well all these models perform. This process is called **tuning**.
+
+We won't go into the details of each hyperparameter, but they work together to affect the way the algorithm trains a model. For instance in boosted trees,
+
+-   `min_n` forces the tree to discard any node that has a number of observations below your specified minimum.
+
+-   tuning the value of `mtry` controls the number of variables that will be used at each split of a decision tree.
+
+-   tuning `tree_depth`, on the other hand, helps by restricting our tree from growing after it reaches a certain level.
+
+In many cases, the default values provided by Tidymodels will work well (see the defaults by running `help("boost_tree")` ); but there may be some advantage in modifying hyperparameters to get better predictive performance or reduce training time.
+
+So how do you know what hyperparameter values you should use? Well, in the absence of a deep understanding of how the underlying algorithm works, you'll need to experiment. Fortunately, Tidymodels provides a way to *tune* hyperparameters by trying multiple combinations and finding the best result for a given performance metric.
+
+#### Identify tuning parameters.
+
+How can we signal to tidymodels functions which arguments (in our case `cost_complexity`, `tree_depth`, `min_n`) should be optimized? Parameters are marked for tuning by assigning them a value of `tune()`.
+
+Next let's build our model specification with some tuning and then put our recipe and model specification together in a **`workflow()`**, for ease of use.
+
+```{r boost_spec_tune,message=F,warning=F}
+# Specify a recipe
+bike_recipe <- recipe(rentals ~ ., data = bike_train) %>% 
+  step_normalize(all_numeric_predictors()) %>% 
+  step_dummy(all_nominal_predictors()) 
+
+
+# Make a tunable model specification
+boost_spec <- boost_tree(trees = 50,
+                         tree_depth = tune(),
+                         learn_rate = tune()) %>% 
+  set_engine('xgboost') %>% 
+  set_mode('regression')
+
+
+# Bundle a recipe and model spec using a workflow
+boost_workflow <- workflow() %>% 
+  add_recipe(bike_recipe) %>% 
+  add_model(boost_spec)
+
+# Print workflow
+boost_workflow
+
+```
+
+#### Create a tuning grid.
+
+Good job! Now that we have specified what parameter to tune, we'll need to figure out a set of possible values to try out then choose the best.
+
+```{r boost_spec_grid, exercise = F, exercise.eval = F,message=F,warning=T}
+# Create a grid of tuning parameters
+tree_grid <- grid_regular(tree_depth(),
+                  # You can specify hyperparameter ranges too
+learn_rate(range = c(0.01, 0.3), trans = NULL), levels = 5)
+
+# Display hyperparameter combinations that will be used for tuning
+tree_grid
+```
+
+The function [`grid_regular()`](https://tidymodels.github.io/dials/reference/grid_regular.html) chooses sensible values to try for each hyperparameter; here, we asked for 5 of each. Since we have two hyperparameters to tune, `grid_regular()` returns 5×5 = 25 different possible tuning combinations to try in a tidy tibble format.
+
+#### Let's sample our data.
+
+As we pointed out earlier, hyperparameters cannot be learned directly from the training set. Instead, they are estimated using simulated data sets created from a process called resampling. One resampling approach is `cross-validation`.
+
+Cross-validation involves taking your training set and randomly dividing it up evenly into `V` subsets/folds. You then use one of the folds for validation and the rest for training, then you repeat these steps with all the subsets and combine the results, usually by taking the mean. This is just one round of cross-validation. Sometimes, to obtain better results, data scientists do this more than once, perhaps 5 times.
+
+```{r bike_folds, exercise = F, exercise.eval = F,message=F,warning=T}
+set.seed(2056)
+# 5 fold CV repeated once
+bike_folds <- vfold_cv(data = bike_train, v = 5, repeats = 1)
+```
+
+#### Time to tune
+
+Now, it's time to tune the grid to find out which hyperparameter combination results in the best performance.
+
+```{r tune_grid, exercise = F, exercise.eval = F,message=F,warning=F}
+# Allow parallel processing
+doParallel::registerDoParallel()
+
+# Model tuning via grid search
+set.seed(2020)
+tree_grid <- tune_grid(
+  object = boost_workflow,
+  resamples = bike_folds,
+  grid = tree_grid
+)
+```
+
+#### Visualize tuning results
+
+Now that we have trained models for many possible hyperparameter values, let's explore the results.
+
+As a first step, we'll use the function **`collect_metrics()`** to extract the performance metrics from the tuning results.
+
+```{r grid_viz, exercise = F, exercise.eval = F,message=F,warning=F}
+# Visualize the results
+tree_grid %>% 
+  collect_metrics() %>% 
+  mutate(tree_depth = factor(tree_depth)) %>% 
+  ggplot(mapping = aes(x = learn_rate, y = mean,
+                       color = tree_depth)) +
+  geom_line(size = 0.6) +
+  geom_point(size = 2) +
+  facet_wrap(~ .metric, scales = 'free', nrow = 2)+
+  scale_color_viridis_d(option = "plasma", begin = .9, end = 0)
+```
+
+We can see that our "stubbiest" tree, with a depth of 1, is the worst model according to both metrics (rmse, rsq) and across all candidate values of `learn_rate`. A tree depth of 4 and a learn_rate of around 0.1 seems to do the trick! Let's investigate these tuning parameters further. We can use `show_best()` to display the top sub-models and their performance estimates.
+
+```{r grid_show, exercise = F, exercise.eval = F,message=F,warning=F}
+tree_grid %>% 
+  show_best('rmse')
+```
+
+We can then use `select_best()` to find the tuning parameter combination with the best performance values.
+
+We can then use `select_best()` to find the tuning parameter combination with the best performance values.
+
+```{r best_tree, exercise = F, exercise.eval = F,message=F,warning=F}
+# Select the tree with the best RMSE
+best_tree <- tree_grid %>% 
+  select_best('rmse')
+
+# Display best tree
+best_tree
+```
+
+### Finalizing our model
+
+Now that we have the best performance values, we can use `tune::finalize_workflow()` to update (or "finalize") our workflow object with the best estimate values for tree_depth and learn_rate.
+
+```{r finalize, exercise = F, exercise.eval = F,message=F,warning=F}
+# Update workflow
+final_wf <- boost_workflow %>% 
+  finalize_workflow(best_tree)
+
+# Print final workflow
+final_wf
+```
+
+Our tuning is done! 🥳 We have updated our workflow with the best estimated hyperparameter values!
+
+#### The last fit: back to our test set.
+
+Finally, let's return to our test data and estimate the model performance we expect to see with new data. We can use the function [`last_fit()`](https://tidymodels.github.io/tune/reference/last_fit.html) with our finalized model; this function *fits* the finalized model on the full training data set and *evaluates* the finalized model on the testing data.
+
+```{r last_fit, exercise = F, exercise.eval = F,message=F,warning=F}
+# Make a last fit
+final_fit <- final_wf %>% 
+  last_fit(bike_split)
+
+
+# Collect metrics
+final_fit %>% 
+  collect_metrics()
+```
+
+How's that for a tune 🎶 ​💃​🕺​​​! Also, there seems to be some improvement in the evaluation metrics compared to using the default values for *learn_rate* and *tree_depth* hyperparameters. Now, we leave it to you to explore how tuning the other hyperparameters affects the model performance.
+
+We've now seen a number of common techniques used to train predictive models for regression. In a real project, you'd likely try a few more algorithms, hyperparameters, and preprocessing transformations; but by now you should have got the general idea of the procedure to follow. You can always explore the [reference docs](https://www.tidymodels.org/find/parsnip/#models), or use the `args()` function to see which parsnip object arguments are available.
+
+> See this [Tidymodels reference page](https://www.tidymodels.org/find/parsnip/#models) to explore model types and engines and to explore model arguments.
+
+Let's now explore how you can use the trained model with new data.
+
+### Use the Trained Model
+
+We'll begin by saving our model but first, let's extract the *trained workflow* object from `final_fit` object.
+
+```{r last_fit_wf, exercise = F, exercise.eval = F,message=F,warning=F}
+# Extract trained workflow
+bike_boost_model <- final_fit$.workflow[[1]]
+
+```
+
+Now, we can save this model to be used later.
+
+```{r s_last_fit_wf, exercise = F, exercise.eval = F,message=F,warning=F}
+# Save trained workflow
+saveRDS(bike_boost_model, 'bike_boost_model.rds')
+
+```
+
+Now, we can load it whenever we need it, and use it to predict labels for new data. This is often called *`scoring`* or *`inferencing`*.
+
+For example, lets try and predict some values from our test set using the saved model.
+
+```{r demo_last_fit_wf, exercise = F, exercise.eval = F,message=F,warning=F}
+# Load the model
+loaded_model <- readRDS("bike_boost_model.rds")
+
+# Extract predictors
+bike_new <- bike_test %>% 
+  dplyr::slice(5:9)
+
+# Use the model to predict rentals
+results <- loaded_model %>% 
+  augment(bike_test)
+
+# See model predictions 
+results
+
+```
+
+PeRfect! All is well that ends with a working model, time to end the cycle **🚴**!
+
+### **Summary**
+
+That concludes the notebooks for this module on regression. In this notebook we ran a complex regression, tuned it, saved the model, and used it to predict outcomes for the future.
+
+### **Further Reading**
+
+To learn more about Tidymodels, see the [Tidymodels documentation](https://www.tidymodels.org/).
+
+```{r eval=FALSE, include=FALSE}
+library(here)
+library(rmd2jupyter)
+rmd2jupyter("02_Regression_Exercise_03.Rmd")
+```
