@@ -281,8 +281,11 @@ Let's get right to it! Functions in R are generally defined in this fashion:
 `name <- function(variables) {return(value)}`
 
 > [patchwork](https://patchwork.data-imaginist.com/) extends `ggplot` API by providing mathematical operators (such as `+` or `/`) for combining multiple plots. Yes, as easy as that!
+>
+> [`glue`](https://www.tidyverse.org/blog/2017/10/glue-1.2.0/) (part of the Tidyverse) allows you to interpolate your data into strings. Much in the same way as `cat` but easier.
 
 ```{r}
+library(glue)
 library(patchwork)
 # Create a function that we can reuse
 show_distribution <- function(var_data, binwidth) {
@@ -295,7 +298,7 @@ show_distribution <- function(var_data, binwidth) {
   mod_val <- statip::mfv(pull(var_data))
 
   # Print the stats
-  stats <- glue::glue(
+  stats <- glue(
   'Minimum: {format(round(min_val, 2), nsmall = 2)}
    Mean: {format(round(mean_val, 2), nsmall = 2)}
    Median: {format(round(med_val, 2), nsmall = 2)}
