@@ -1,0 +1,170 @@
+---
+title: 'Explore and analyze data with R'
+output:
+  html_document:
+    df_print: paged
+    theme: flatly
+    highlight: breezedark
+    toc: yes
+    toc_float: yes
+    code_download: yes
+---
+
+## **Flights Data Exploration Challenge**
+
+A significant part of a a data scientist's role is to explore, analyze, and visualize data. In this challenge, you'll explore a real-world dataset containing flights data from the US Department of Transportation.
+
+Let's start by loading the required packages.
+
+```{r}
+# Load the packages in the tidyverse into the current R session
+suppressPackageStartupMessages({
+  library(tidyverse)
+  library(summarytools)
+  })
+
+
+```
+
+Now, we can import the into R and start doing some data science on it!
+
+```{r}
+# Load and view the data
+df_flights <- read_csv("https://raw.githubusercontent.com/MicrosoftDocs/ml-basics/master/challenges/data/flights.csv", show_col_types = FALSE)
+
+df_flights %>% 
+  slice_head(n = 7)
+```
+
+The dataset contains observations of US domestic flights in 2013, and consists of the following fields:
+
+-   **Year**: The year of the flight (all records are from 2013)
+
+-   **Month**: The month of the flight
+
+-   **DayofMonth**: The day of the month on which the flight departed
+
+-   **DayOfWeek**: The day of the week on which the flight departed - from 1 (Monday) to 7 (Sunday)
+
+-   **Carrier**: The two-letter abbreviation for the airline.
+
+-   **OriginAirportID**: A unique numeric identifier for the departure aiport
+
+-   **OriginAirportName**: The full name of the departure airport
+
+-   **OriginCity**: The departure airport city
+
+-   **OriginState**: The departure airport state
+
+-   **DestAirportID**: A unique numeric identifier for the destination aiport
+
+-   **DestAirportName**: The full name of the destination airport
+
+-   **DestCity**: The destination airport city
+
+-   **DestState**: The destination airport state
+
+-   **CRSDepTime**: The scheduled departure time
+
+-   **DepDelay**: The number of minutes departure was delayed (flight that left ahead of schedule have a negative value)
+
+-   **DelDelay15**: A binary indicator that departure was delayed by more than 15 minutes (and therefore considered "late")
+
+-   **CRSArrTime**: The scheduled arrival time
+
+-   **ArrDelay**: The number of minutes arrival was delayed (flight that arrived ahead of schedule have a negative value)
+
+-   **ArrDelay15**: A binary indicator that arrival was delayed by more than 15 minutes (and therefore considered "late")
+
+-   **Cancelled**: A binary indicator that the flight was cancelled
+
+Your challenge is to explore the flight data to analyze possible factors that affect delays in departure or arrival of a flight.
+
+1.  Start by cleaning the data.
+
+    -   Identify any null or missing data, and impute appropriate replacement values.
+
+    -   Identify and eliminate any outliers in the **DepDelay** and **ArrDelay** columns.
+
+2.  Explore the cleaned data.
+
+    -   View summary statistics for the numeric fields in the dataset.
+
+    -   Determine the distribution of the **DepDelay** and **ArrDelay** columns.
+
+    -   Use statistics, aggregate functions, and visualizations to answer the following questions:
+
+        -   *What are the average (mean) departure and arrival delays?*
+
+        -   *How do the carriers compare in terms of arrival delay performance?*
+
+        -   *Is there a noticable difference in arrival delays for different days of the week?*
+
+        -   *Which departure airport has the highest average departure delay?*
+
+        -   *Do **late** departures tend to result in longer arrival delays than on-time departures?*
+
+        -   *Which route (from origin airport to destination airport) has the most **late** arrivals?*
+
+        -   *Which route has the highest average arrival delay?*
+
+Sometimes, when we have a lot of columns in our data, it may difficult to get a grip of the data at first sight using `slice_head`
+
+`glimpse` produces a transposed version where columns run down the page, and data runs across. This makes it possible to see every column in a data frame. Into the bargain, it also shows the dimension of the tibble and underlying data types of the columns.
+
+```{r}
+# Get a glimpse of your data
+df_flights %>% 
+  glimpse()
+
+```
+
+## Clean missing values
+
+Once you have imported your data, it is always a good idea to clean it. Sadly, this is often chronically underestimated, yet it's a fundamental step required for the subsequent operations in data analysis.
+
+Let's find how many null values there are for each column.
+
+```{r}
+# Find how many null values there are for each column.
+colSums(is.na(df_flights))
+```
+
+Hmm, looks like there are some NA (missing values) `late departure` indicators. Departures are considered late if the delay is 15 minutes or more, so let's see the delays for the ones with an NA late indicator:
+
+```{r}
+# Filter the tibble to obtain rows where there is a missing value
+# and then select DepDelay and DepDel15 columns
+df_flights %>% 
+  filter(rowSums(is.na(.)) > 0) %>% 
+  select(DepDelay,DepDel15) %>% 
+  slice_head(n = 20)
+```
+
+We can't see them all in this display, but from the first 20 observations, it looks like they may all have delay of 0. Let's check by looking at the summary statistics for these records:
+
+```{r}
+# Get summary statistics using summary function
+df_flights %>% 
+  filter(rowSums(is.na(.)) > 0) %>% 
+  select(DepDelay) %>%
+  summary()
+
+```
+
+The min, max, and mean are all 0; so it seems that none of these were actually *late* departures. Let's replace the missing values in **DepDel15** column with a 0 and confirm there are no more missing values.
+
+```{r}
+# Replace missing values in DepDel15 with 0
+df_flights <- df_flights %>% 
+  mutate(DepDel15 = replace_na(DepDel15, 0))
+
+# Confirm there are no missing values
+anyNA(df_flights)
+```
+
+```{r}
+library(here)
+library(rmd2jupyter)
+rmd2jupyter("01_Data_Exploration_Solution.Rmd")
+```
