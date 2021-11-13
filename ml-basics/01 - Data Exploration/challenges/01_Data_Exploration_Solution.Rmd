@@ -444,5 +444,5 @@ Happy Learning,
 ```{r}
 library(here)
 library(rmd2jupyter)
-#rmd2jupyter("01_Data_Exploration_Solution.Rmd")
+rmd2jupyter("01_Data_Exploration_Solution.Rmd")
 ```
