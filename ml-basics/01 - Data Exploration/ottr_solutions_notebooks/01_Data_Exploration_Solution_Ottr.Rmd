@@ -248,7 +248,7 @@ test_that('data has no missing values', {
 })
 ```
 
-Good job 👏! No missing values now. Let's take this a little further.
+Good job! No missing values now. Let's take this a little further.
 
 ### **Clean outliers**
 
@@ -340,6 +340,7 @@ show_distribution(var_data = df_col, binwidth = 100)
 
 
 ```{r}
+## Test ##
 test_that('df_col corresponds to DepDelay', {
   
   expect_equal(colnames(df_col), "DepDelay")
@@ -406,6 +407,7 @@ show_distribution(var_data = df_col, binwidth = 100)
 
 
 ```{r}
+## Test ##
 test_that('df_col corresponds to ArrDelay', {
   
   expect_equal(colnames(df_col), "ArrDelay")
@@ -528,6 +530,7 @@ DepDelay_90pcntile <- df_flights %>%
 
 
 ```{r}
+## Test ##
 test_that('quantile dimensions are correct', {
   expect_equal(length(DepDelay_01pcntile), 1)
   expect_equal(length(DepDelay_90pcntile), 1)
@@ -608,7 +611,7 @@ show_distribution(var_data = select(df_flights, DepDelay), binwidth = 2)
 show_distribution(var_data = select(df_flights, ArrDelay), binwidth = 2)
 ```
 
-Much better 🤩!
+Much better!
 
 Now that the data is all cleaned up, we can begin doing some exploratory analysis.
 
@@ -762,7 +765,7 @@ df_flights %>%
   geom_boxplot(mapping = aes(x = DepDel15, y = ArrDelay, fill = DepDel15)) 
 ```
 
-Does this surprise you 🤷?
+Does this surprise you?
 
 ### **Which route (from origin airport to destination airport) has the most late arrivals?**
 Finally, let's investigate travel routes. We'll start by adding a column `Route` that indicates the Origin and Destination airports.
@@ -861,7 +864,7 @@ test_that('summary tibble has correct values', {
 
 
 
-Congratulations on finishing the first challenge 🎉! We'll wrap it at that for now. Of course there are other ways to approach this challenge. So please feel free to experiment, google and share your solutions with friends.
+Congratulations on finishing the first challenge! We'll wrap it at that for now. Of course there are other ways to approach this challenge. So please feel free to experiment, google and share your solutions with friends.
 
 See you in the next module where we get started with Machine Learning!
 
@@ -872,5 +875,5 @@ Happy Learning,
 ```{r}
 library(here)
 library(rmd2jupyter)
-rmd2jupyter("01_Data_Exploration_Solution.Rmd")
+rmd2jupyter("01_Data_Exploration_Solution_Ottr.Rmd")
 ```
