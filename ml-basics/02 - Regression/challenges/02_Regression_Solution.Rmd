@@ -335,7 +335,7 @@ list(metrics = rf_metrics, evaluation_plot = rf_plt)
 Save your trained model, and then use it to predict the price-per-unit for the following real estate transactions:
 
 | **transaction_date** | **house_age** | **transit_distance** | **local_convenience_stores** | **latitude** | **longitude** |
-|:---------------------|:--------------|:---------------------|:-----------------------------|:-------------|:--------------|
+|---------------------|----------------|--------------|--------|-------|------|
 | 2013.167             | 16.2          | 289.3248             | 5                            | 24.98203     | 121.54348     |
 | 2013.000             | 13.6          | 4082.015             | 0                            | 24.94155     | 121.50381     |
 
