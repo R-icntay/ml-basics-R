@@ -123,28 +123,23 @@ What can you observe from the boxplot? Yes, outliers.
 
 ### Remove outliers
 
-We are now set to begin writing some code ourselves. Let's begin by dealing with ouliers. An outlier is a data point that differs significantly from other observations.
+We are now set to begin writing some code ourselves 🙂. Let's begin by dealing with ouliers. An outlier is a data point that differs significantly from other observations.
 
 **Question 1.**
 
-Starting with the `estate_data` dataset, `filter` to create a subset that contains observations where `price_per_unit` is less than `70`. 
-
-
+Starting with the `estate_data` dataset, `filter` to create a subset that contains observations where `price_per_unit` is less than `70`.
 
 ```{r}
 # Narrow down to observations whose price_per_unit is less than 70
 estate_data <- estate_data %>% 
-  filter(price_per_unit < 70)
-```
+  ......
 
+
+```
 
 ```{r}
 . = ottr::check("tests/Question 1.R")
 ```
-
-
-
-
 
 Now let's take a look at the distribution without the outliers.
 
@@ -179,7 +174,7 @@ box_plt <- estate_data %>%
                     plot.title = element_text(hjust = 0.5)))
 ```
 
-Much better! What can you say about the distribution of the price?
+Much better 🤩! What can you say about the distribution of the price?
 
 ### View numeric correlations
 
@@ -187,27 +182,27 @@ We can now start to look for relationships between the *features* and the *label
 
 The *correlation* statistic, *r*, is a value between -1 and 1 that indicates the strength of a linear relationship.
 
-For the numeric features, we can create scatter plots that show the intersection of feature and label values.
-
+For numeric feature and label columns, we can create scatter plots that show the intersection of the feature and label values.
 
 **Question 2.**
 
-Starting with the `estate_data` dataset, in a piped sequence:
-- `pivot_longer` the data (increase the number of rows and decrease the number of columns) such that all the existing column names except price_per_unit now fall under a new column name called **`features`** and their corresponding values under a new column name **`values`**
+Starting with the `estate_data` dataset, in a piped sequence: - `pivot_longer` the data (increase the number of rows and decrease the number of columns) such that all the existing column names except price_per_unit, now fall under a new column name called **`features`** and their corresponding values under a new column name **`values`**
 
-- group the data by `features`
+-   group the data by `features`
 
-- add a new column `corr_coef` which calculates the correlation between `values` and `price_per_unit` (hint: the function used for calculating correlation in R is `cor()`)  
-
-
+-   add a new column `corr_coef` which calculates the correlation between `values` and `price_per_unit` (hint: the function used for calculating correlation in R is `cor()`)
 
 ```{r}
 # Pivot numeric features to a long format
 numeric_features_long <- estate_data %>% 
-  pivot_longer(!price_per_unit, names_to = "features", values_to = "values") %>%
-  group_by(features) %>% 
-  mutate(corr_coef = cor(values, price_per_unit),
-         features = paste(features, ' vs price, r = ', round(corr_coef, 2), sep = '')) %>% 
+  pivot_....(!price_per_unit, names_to = "____", values_to = "____") %>%
+  # Group by features
+  ....(features) %>% 
+  # Calculate correlation coefficient between values and price_per_unit
+  mutate(corr_coef = ____) %>% 
+  
+  # Modifies the feature column to also include corr_coef
+  mutate(features = paste(features, ' vs price, r = ', round(corr_coef, 2), sep = '')) %>% 
   ungroup()
 
 # Print the first few rows of the data
@@ -221,7 +216,6 @@ numeric_features_long %>%
 
 Fantastic! Now let's use a scatter plot to investigate whether there is any linear relationship between our predictors and outcome variables.
 
-
 ```{r numeric_feature}
 # Plot a scatter plot for each feature
 numeric_features_long %>% 
@@ -231,8 +225,6 @@ numeric_features_long %>%
   paletteer::scale_color_paletteer_d("ggthemes::excel_Parallax") 
 
 ```
-
-
 
 Take a moment and go through the scatter plot. How does the correlation between these features and the price vary?
 
@@ -246,35 +238,29 @@ Now let's compare the categorical features to the label. We'll do this by creati
 
 Starting with the `estate_data` dataset, in a piped sequence:
 
-- only keep columns `transaction_date`, `local_convenience_stores` and `price_per_unit`
+-   only keep columns `transaction_date`, `local_convenience_stores` and `price_per_unit`
 
-- encode columns `transaction_date` and `local_convenience_stores` as categorical (factor)
+-   encode columns `transaction_date` and `local_convenience_stores` as categorical (factor)
 
-- `pivot_longer` the data (increase the number of rows and decrease the number of columns) such that all the existing column names except price_per_unit now fall under a new column name called **`features`** and their corresponding values under a new column name **`values`**
-
-
-
+-   `pivot_longer` the data (increase the number of rows and decrease the number of columns) such that all the existing column names except price_per_unit now fall under a new column name called **`features`** and their corresponding values under a new column name **`values`**
 
 ```{r}
 # Pivot categorical features to a long format
 cat_features_long <- estate_data %>% 
-  select(transaction_date, local_convenience_stores, price_per_unit) %>% 
-  # Encode features from numeric to categorical
-  mutate(across(c(transaction_date, local_convenience_stores), factor)) %>% 
-  pivot_longer(!price_per_unit, names_to = "features", values_to = "values") 
+  ____(transaction_date, ____, ____) %>% 
+  # Encode transaction_date & local_convenience_stores features
+  # from numeric to categorical
+  mutate(____) %>% 
+  pivot_longer(____) 
 
 # Print some observations
 cat_features_long %>% 
   slice_head(n = 10)
 ```
 
-
-
 ```{r}
 . = ottr::check("tests/Question 3.R")
 ```
-
-
 
 Perfect! Now, for our categorical features, boxplots can be a great way of visualising how the price per unit varies within the levels of the categorical feature.
 
@@ -299,17 +285,13 @@ Now that we've explored the data, it's time to use it to train a regression mode
 
 Let's begin by splitting the data set such that some goes to training and some goes for validation. This enables us to evaluate how well the model performs in order to get a better estimate of how your models will perform on new data.
 
-
 **Question 4.**
 
 In this section:
 
-- Make a split specification of `estate_data` such that `70%` goes to training and the rest goes to testing. Save this to a variable name `estate_split`
+-   Make a split specification of `estate_data` such that `70%` goes to training and the rest goes to testing. Save this to a variable name `estate_split`
 
-- Extract the training and testing sets from `estate_split` and save them in `estate_train` and `estate_test` variable names respectively.
-
-
-
+-   Extract the training and testing sets from `estate_split` and save them in `estate_train` and `estate_test` variable names respectively.
 
 ```{r data_split}
 # Set seed to ensure reproducibility and consitency of outputs
@@ -320,11 +302,11 @@ library(tidymodels)
 
 # Split 70% of the data for training and the rest for tesing
 estate_split <- estate_data %>% 
-  initial_split(prop = 0.7)
+  initial_split(____)
 
-# Extract the data in each split
-estate_train <- training(estate_split)
-estate_test <- testing(estate_split)
+# Extract the train and test data in each split
+estate_train <- ____(estate_split)
+estate_test <- ____(estate_split)
 
 # Print the number of observations in each split
 cat("Training Set", nrow(estate_train), "rows",
@@ -333,16 +315,11 @@ cat("Training Set", nrow(estate_train), "rows",
 
 ```
 
-
-
 ```{r}
 . = ottr::check("tests/Question 4.R")
 ```
 
-
-
-Great progress! Now let's train some models.
-
+Great progress 💪! Now let's train some models.
 
 ## Train a regression model
 
@@ -362,33 +339,24 @@ In this section, specify a recipe, `estate_recipe`, that will:
 
 -   Center and scale all numeric predictors
 
-
-
-
-
-
 ```{r rec}
 # Create a preprocessing recipe
-estate_recipe <- recipe(price_per_unit ~ ., data = estate_train) %>%
-  # Specify the removal of a variable
-  step_rm(transaction_date) %>% 
+estate_recipe <- ____(price_per_unit ~ ., data = estate_train) %>%
+  # Specify the removal of transaction_date 
+  step_rm(____) %>% 
   # Specify the encoding of local_convenience_stores as categorical
   step_mutate(
-    local_convenience_stores = factor(local_convenience_stores)) %>%
+    local_convenience_stores = ____) %>%
   # Specify the normalization of numeric features
-  step_normalize(all_numeric_predictors())
+  ____(all_numeric_predictors())
  
 # Print recipe
 estate_recipe
 ```
 
-
 ```{r}
 . = ottr::check("tests/Question 5.R")
 ```
-
-
-
 
 Fantastic! We have the data processing in order. Now, let's make a model specification. In this solution, we'll try out a random forest model which applies an averaging function to multiple decision tree models for a better overall model.
 
@@ -396,22 +364,18 @@ Fantastic! We have the data processing in order. Now, let's make a model specifi
 
 Create a random forest model specification, `rf_spec`, which uses the `randomForest` package as its engine and then set the mode to `regression`.
 
-
-
 ```{r}
 # Build a random forest model specification
 rf_spec <- rand_forest() %>% 
-  set_engine('randomForest') %>% 
-  set_mode('regression')
+  # Specify engine
+  ____ %>%
+  # Specify mode
+  set_mode('____')
 ```
-
 
 ```{r}
 . = ottr::check("tests/Question 6.R")
 ```
-
-
-
 
 ### Create a modeling workflow
 
@@ -421,24 +385,20 @@ The **workflows** package allows the user to bind modeling and preprocessing obj
 
 Components of a `workflow()` go together like LEGO blocks. In this section, create a workflow container and then add the preprocessing information from our recipe and then add the model specification to be trained.
 
-
-
 ```{r}
 # Create a workflow that bundles a recipe and model specification
 rf_workflow <- workflow() %>% 
-  add_recipe(estate_recipe) %>% 
-  add_model(rf_spec)
-
+  # Add a recipe
+  add_recipe(___) %>% 
+  # Add a model specification
+  ____
 # Print workflow
 rf_workflow
 ```
 
-
 ```{r}
 . = ottr::check("tests/Question 7.R")
 ```
-
-
 
 Now that we have everything (recipe + model specification) wrapped together nicely in a workflow, we are ready to train a model. Workflows have a `fit()` method that can be used to train a model.
 
@@ -454,40 +414,31 @@ rf_workflow_fit <- rf_workflow %>%
 rf_workflow_fit
 ```
 
-Excellent! So we now have a trained random forest model; but is it any good? Let's evaluate its performance! We'll do this by making predictions on the **test data** and then evaluate some performance metrics based on the actual outcomes. 
-
+Excellent! So we now have a trained random forest model; but is it any good? Let's evaluate its performance! We'll do this by making predictions on the **test data** and then evaluate some performance metrics based on the actual outcomes.
 
 **Question 8.**
 
-- We'll evaluate the model performance based on the `rmse` and `rsq` metrics. Use the `metric_set()` function to combine these metric functions together into a new function, `eval_metrics`, that calculates all of them at once.
+-   We'll evaluate the model performance based on the `rmse` and `rsq` metrics. Use the `metric_set()` function to combine these metric functions together into a new function, `eval_metrics`, that calculates all of them at once.
 
-- Generate predictions for the test data and then bind them to the test set. Rename the column containing predictions from `.pred` to `predictions`.
-
-
+-   Generate predictions for the test data and then bind them to the test set. Rename the column containing predictions from `.pred` to `predictions`.
 
 ```{r model_eval}
 # Create a metric set
-eval_metrics <- metric_set(rmse, rsq)
+eval_metrics <- ____(rmse, ____)
 
 
 # Make and bind predictions to test data 
 results <- rf_workflow_fit %>% 
-  augment(new_data = estate_test) %>% 
-  rename(predictions = .pred)
+  __________
 ```
-
 
 ```{r}
 . = ottr::check("tests/Question 8.R")
 ```
 
-
-
-
 Awesome work! You have just used your trained model to make predictions on the test set.
 
 How well did the model predict the prices per unit? Let's find out by looking at the metrics.
-
 
 ```{r}
 # Evaluate the model
@@ -518,10 +469,13 @@ How do you think the model performed. What do the values for `rsq` and `rmse` te
 
 Save your trained model, and then use it to predict the price-per-unit for the following real estate transactions:
 
++----------------------+---------------+----------------------+------------------------------+--------------+---------------+
 | **transaction_date** | **house_age** | **transit_distance** | **local_convenience_stores** | **latitude** | **longitude** |
-|---------------------|----------------|--------------|--------|-------|------|
++======================+===============+======================+==============================+==============+===============+
 | 2013.167             | 16.2          | 289.3248             | 5                            | 24.98203     | 121.54348     |
++----------------------+---------------+----------------------+------------------------------+--------------+---------------+
 | 2013.000             | 13.6          | 4082.015             | 0                            | 24.94155     | 121.50381     |
++----------------------+---------------+----------------------+------------------------------+--------------+---------------+
 
 ```{r rf_save}
 library(here)
@@ -560,15 +514,17 @@ predictions
 
 That's it for now. In this notebook, you:
 
-- Explored the data set to understand the relationships between the predictors and outcomes
-- Preprocessed the data using recipes to make them easier for a model to use effectively.
-- Made a random forest model specifcation.
-- Bundles a recipe and model specification into a workflow.
-- Trained a model.
-- Made predictions on test set and evaluated the model performance.
-- Saved the model, loaded it and then used it to predict labels for new data.
+-   Explored the data set to understand the relationships between the predictors and outcomes
+-   Preprocessed the data using recipes to make them easier for a model to use effectively.
+-   Made a random forest model specifcation.
+-   Bundles a recipe and model specification into a workflow.
+-   Trained a model.
+-   Made predictions on test set and evaluated the model performance.
+-   Saved the model, loaded it and then used it to predict labels for new data.
 
-Fantastic job for coming this far! Feeling adventurous? Then, be sure to try out other regression models and tune some hyperparameters while at it.
+Fantastic job for coming this far 👏! Feeling adventurous? Then, be sure to try out other regression models and tune some hyperparameters while at it.
+
+See you in our next module as we explore the realm of `classification` models!
 
 Happy Learning,
 
