@@ -5,7 +5,7 @@ test = list(
       hidden = FALSE,
       name = NA,
       points = 1.0,
-      success_message = "Fantastic! You have successfullly used the trained model to make predictions for the test set and then binded the predictions to the test set.",
+      success_message = "Fantastic! You have successfully used the trained model to make predictions for the test set and then binded the predictions to the test set.",
       failure_message = "Almost there! Generate predictions for the test data and then bind them to the test set. Hints: augment or predict + bind_cols functions. Also don't forget to rename your .pred column.",
       code = {
         ## Test ##
