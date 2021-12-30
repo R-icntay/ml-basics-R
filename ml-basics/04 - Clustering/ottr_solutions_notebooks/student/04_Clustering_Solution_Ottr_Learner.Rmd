@@ -159,7 +159,7 @@ A metric often used to measure this tightness is the *within cluster sum of squa
 # Obtain normalized Data for estimating clusters
 clust_estimate_data <- recipe(~ ., data = clust_data) %>%
   # Step to normalize all predictors
-  ____ %>% 
+  ____(all_predictors()) %>% 
   # Prep the recipe
   ____ %>% 
   # Apply trained recipe to train set: clust_data
