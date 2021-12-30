@@ -318,7 +318,9 @@ failure_message: Let's have a look at this again. Ensure you have set the **wine
 
 ## Test ##
 test_that('recipe specification is correct', {
-  expect_output(invisible(print(wine_recipe)), "Recipe\n\nInputs:\n\n\nOperations:\n\nCentering and scaling for all_numeric_predictors()", fixed = TRUE)
+  expect_equal(attr(wine_recipe[["steps"]][[1]], "class"), c("step_normalize","step"))
+  expect_equal(as_label(wine_recipe[["steps"]][[1]][["terms"]][[1]]), "all_numeric_predictors()")
+  
   
   expect_equal(summary(wine_recipe) %>% filter(variable == "wine_variety") %>% pull(role), "outcome")
 })
@@ -338,7 +340,13 @@ failure_message: Let's have a look at this again. Perhaps we forgot to add somet
 
 ## Test ##
 test_that('workflow specification is correct', {
-  expect_output(print(mr_wflow), "== Workflow ====================================================================\nPreprocessor: Recipe\nModel: multinom_reg()\n\n-- Preprocessor ----------------------------------------------------------------\n1 Recipe Step\n\n* step_normalize()\n\n-- Model -----------------------------------------------------------------------\nMultinomial Regression Model Specification (classification)\n\n", fixed = TRUE)
+  # Test whether wf has a recipe
+  expect_equal(attr(mr_wflow[["pre"]][["actions"]][["recipe"]][["recipe"]][["steps"]][[1]], "class"), c("step_normalize","step"))
+  expect_equal(as_label(mr_wflow[["pre"]][["actions"]][["recipe"]][["recipe"]][["steps"]][[1]][["terms"]][[1]]), "all_numeric_predictors()")
+  
+  # Test whether wf has model spec
+expect_equal(mr_wflow[["fit"]][["actions"]][["model"]][["spec"]][["mode"]], "classification")
+expect_equal(mr_wflow[["fit"]][["actions"]][["model"]][["spec"]][["engine"]], "nnet")
   
 })
 ```
