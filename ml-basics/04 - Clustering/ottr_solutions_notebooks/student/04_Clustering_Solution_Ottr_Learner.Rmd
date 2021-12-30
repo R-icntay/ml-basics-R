@@ -1,0 +1,447 @@
+---
+title: 'Train and Evaluate Clustering Models using Tidymodels and friends'
+output:
+  html_document:
+    #css: style_7.css
+    df_print: paged
+    theme: flatly
+    highlight: breezedark
+    toc: yes
+    toc_float: yes
+    code_download: yes
+---
+
+## **Clustering Challenge**
+
+Clustering is an *unsupervised* machine learning technique in which you train a model to group similar entities into clusters based on their features.
+
+In this exercise, you must separate a dataset consisting of three numeric features (**A**, **B**, and **C**) into clusters.
+
+Let's begin by importing the data.
+
+```{r read_url, message=F, warning=F}
+# Load the core tidyverse and make it available in your current R session
+library(tidyverse)
+
+# Read the csv file into a tibble
+clust_data <- read_csv(file = "https://raw.githubusercontent.com/MicrosoftDocs/ml-basics/master/challenges/data/clusters.csv", show_col_types = FALSE)
+
+# Print the first 10 rows of the data
+clust_data %>% 
+  slice_head(n = 10)
+```
+
+Your challenge is to identify the number of discrete clusters present in the data, and create a clustering model that separates the data into that number of clusters. You should also visualize the clusters to evaluate the level of separation achieved by your model.
+
+Add markdown and code cells as required to create your solution.
+
+### **Use PCA to create a 2D version of the features for visualization**
+
+*`Principal Component Analysis`* (PCA) is a dimension reduction method that aims at reducing the feature space, such that, most of the information or variability in the data set can be explained using fewer uncorrelated features. Let's see this in action by creating a specification of a `recipe` that will estimate the *principal components* based on our three variables. We'll later `prep` and`bake` the recipe to apply the computations.
+
+
+**Question 1.**
+
+For this question, create a specification of a `recipe` that will:
+- Normalize all predictors.
+- Convert all predictors into **two** principal components.
+
+
+
+```{r pca_prep, message=F, warning=F}
+set.seed(2056)
+# Load the core tidymodels packages and make them available in your current R session
+library(tidymodels)
+
+# Specify a recipe
+pca_rec <- recipe(____, data = clust_data) %>%
+  # Recipe step for normalizing predictors
+  ____(all_predictors()) %>% 
+  # Recipe step for converting all predictors into 2 PCs
+  step_pca(____, num_comp = ____, id = "pca")
+
+# Print out recipe
+pca_rec
+
+```
+
+
+```{r}
+. = ottr::check("tests/Question 1.R")
+```
+
+
+
+Well done! Compared to supervised learning techniques, we have no `outcome` variable in this recipe.
+
+Now, time to prep and bake the recipe!
+
+**Question 2.**
+
+In this section:
+- Prep the recipe you created above. Prepping a recipe estimates the required quantities and statistics required by PCA.
+- Bake the prepped recipe. This takes the trained (prepped) recipe and applies its operations to a data set to create a design matrix. 
+
+```{r bake}
+# Estimate the recipe 
+pca_estimates <- prep(____)
+
+# Return preprocessed clust_data using bake
+features_2d <- pca_estimates %>% 
+  ____(new_data = NULL)
+
+# Print baked data set
+features_2d %>% 
+  slice_head(n = 5)
+
+```
+
+
+
+```{r}
+. = ottr::check("tests/Question 2.R")
+```
+
+
+
+🤩 Good job! After prep and bake, you obtain two components which capture the maximum amount of information (i.e. variance) in the original variables.
+
+From the output of our prepped recipe `pca_estimates`, we can examine how much variance each component accounts for:
+
+```{r variance}
+# Examine how much variance each PC accounts for
+pca_estimates %>% 
+  tidy(id = "pca", type = "variance") %>% 
+  filter(str_detect(terms, "percent"))
+
+
+theme_set(theme_light())
+# Plot how much variance each PC accounts for
+pca_estimates %>% 
+  tidy(id = "pca", type = "variance") %>% 
+  filter(terms == "percent variance") %>% 
+  ggplot(mapping = aes(x = component, y = value)) +
+  geom_col(fill = "midnightblue", alpha = 0.7) +
+  ylab("% of total variance")
+```
+
+This output tibbles and plots shows how well each principal component is explaining the original six variables. For example, the first principal component (PC1) explains about `84.93%` of the variance of the three variables. The second principal component explains an additional `7.63%`, giving a cumulative percent variance of `92.56%`. This is certainly better. It means that the first two variables seem to have some power in summarizing the original three variables.
+
+Now that we have the data points translated to two dimensions PC1 and PC2, we can visualize them in a plot:
+
+```{r pca_plot}
+# Visualize PC scores
+features_2d %>% 
+  ggplot(mapping = aes(x = PC1, y = PC2)) +
+  geom_point(size = 2, color = "dodgerblue3")
+
+```
+
+### **Calculate WCSS for multiple cluster numbers to determine the right number of clusters**
+
+Now here lies one of the fundamental problems with clustering - without known class labels, how do you know how many clusters to separate your data into?
+
+
+**Question 3.**
+
+In this section, we'll try to find the optimal number of clusters our data can be divided into by using our data sample, `clust_data`, to create a series of clustering models with an incrementing number of clusters, and then measure how tightly the data points are grouped within each cluster.
+
+A metric often used to measure this tightness is the *within cluster sum of squares* (WCSS), with lower values meaning that the data points are closer. You can then plot the WCSS for each model.
+
+- Prep and bake `clust_data` to obtain a new tibble where all the predictors are normalized.
+- Use the built-in `kmeans()` function to perform clustering by creating a series of 10 clustering models.
+- Extract the WCSS, `tot.withinss` for each cluster.
+
+
+```{r clustering}
+# Obtain normalized Data for estimating clusters
+clust_estimate_data <- recipe(~ ., data = clust_data) %>%
+  # Step to normalize all predictors
+  ____ %>% 
+  # Prep the recipe
+  ____ %>% 
+  # Apply trained recipe to train set: clust_data
+  bake(new_data = NULL)
+
+# Print out data
+clust_estimate_data %>% 
+  slice_head(n = 5)
+```
+
+
+
+
+
+Now, let's explore the WCSS of different numbers of clusters.
+
+We'll get to use `map()` from the [purrr](https://purrr.tidyverse.org/) package to apply functions to each element in list.
+
+> [`map()`](https://purrr.tidyverse.org/reference/map.html) functions allow you to replace many for loops with code that is both more succinct and easier to read. The best place to learn about the [`map()`](https://purrr.tidyverse.org/reference/map.html) functions is the [iteration chapter](http://r4ds.had.co.nz/iteration.html) in R for data science.
+>
+> `broom::glance.kmeans()` accepts a model object and returns a tibble with exactly one row of model summaries. The summaries are typically goodness of fit measures, p-values for hypothesis tests on residuals, or model convergence information.
+
+```{r}
+set.seed(2056)
+# Create 10 models with 1 to 10 clusters
+kclusts <- tibble(k = ____) %>% 
+  mutate(
+    # Create a series of clustering models with centers k
+    model = map(k, ~ kmeans(x = clust_estimate_data, centers = .x, nstart = 20)),
+    # Extract the Total WCSS tot.withinss, for each model
+    tot.withinss = map_dbl(____, ~ glance(.x)$tot.withinss))
+
+
+
+# Plot Total within-cluster sum of squares (tot.withinss) for each model with center k
+kclusts %>% 
+  ggplot(mapping = aes(x = k, y = _____)) +
+  geom_line(size = 1.2, alpha = 0.5, color = "dodgerblue3") +
+  geom_point(size = 2, color = "dodgerblue3")
+```
+
+
+
+```{r}
+. = ottr::check("tests/Question 3.R")
+```
+
+
+
+That went well! What do you think the chart is telling us?
+
+
+
+We seek to **minimize** the the total within-cluster sum of squares, by performing K-means clustering. The plot shows a large reduction in WCSS (so greater *tightness*) as the number of clusters increases from one to two, and a further noticeable reduction from two to three, then three to four clusters. After that, the reduction is less pronounced, resulting in an `elbow` 💪in the chart at around four clusters. This is a good indication that there are four reasonably well separated clusters of data points.
+
+### **Use K-Means**
+
+**Question 4.**
+
+
+In the previous section, we noticed that there is a good indication that there are four reasonably well separated clusters of data points. In this section:
+
+Extract the model separates the data into k = 4 clusters. Starting with the clustering results `kclusts`:
+- create a subset where the models contains `k = 4` clusters.
+- And then, using `pull()`, extract the clustering model in the `model` column.
+- And then retrieve the model components, such as cluster assignments, using `pluck()`
+
+
+
+```{r extract_model}
+# Extract the model with k = 4 clusters
+final_kmeans <- kclusts %>% 
+  # Narrow down to the model with K = 4 centers
+  filter(____) %>%
+  # Extract the clustering model
+  ___(model) %>% 
+  # Retrieve model components
+  ____(1)
+
+# Print model components
+final_kmeans
+```
+
+
+
+```{r}
+. = ottr::check("tests/Question 4.R")
+```
+
+
+
+
+What can you make out of the kmeans object, `final_kmeans`? One of the available components is the `Clustering vector`: A vector of integers (from 1:k) indicating the cluster to which each observation in our data is allocated. Be sure to explore the other available components.
+
+
+### **Plot the clustered points**
+
+Great! Let's go ahead and visualize the clusters obtained.
+
+**Question 5.**
+
+In this section:
+
+- Add the cluster assignments generated by the model to the 2D version (2 Principal Components) of our data set, i.e `features_2d`. Hint: `augment`accepts a model object and a dataset and adds information about each observation in the dataset.
+
+- Visualize the cluster assignments using a scatter plot. Assign the `shape` and `color` aesthetics to the cluster number assigned to each data point.
+
+
+
+```{r viz_clust, message=F, warning=F}
+# Load plotting libraries 
+library(plotly)
+library(paletteer)
+
+
+# Augment featured_2d with information from the clustering model
+results <-  augment(_____, _____) 
+
+# Print some rows of the results
+results %>% 
+  slice_head(n = 10)
+```
+Voila! There goes the two Principal Components (PC1, PC2) which capture the maximum amount of information (i.e. variance) in the original variables along with their corresponding cluster assignment (.cluster).
+
+Now, let's see this in an interactive plot!
+
+```{r clust, message=F, warning=F}
+# Plot cluster assignments
+cluster_plot <- results %>% 
+  ggplot(mapping = aes(x = PC1, y = PC2)) +
+  geom_point(aes(____, ____), size = 2, alpha = 0.8) +
+  paletteer::scale_color_paletteer_d("ggsci::category10_d3")
+
+# Make plot interactive
+ggplotly(cluster_plot)
+
+
+```
+
+```{r}
+. = ottr::check("tests/Question 5.R")
+```
+
+🤩🤩 Hopefully we are able to observe that the data has been separated into four distinct clusters. 
+
+K-Means is a commonly used clustering algorithm that separates a dataset into K clusters of equal variance such that observations within the same cluster are as similar as possible (i.e., high intra-class similarity), whereas observations from different clusters are as dissimilar as possible (i.e., low inter-class similarity).
+
+The first step in K-Means clustering is the data scientist specifying the number of clusters K to partition the observations into. Hierarchical clustering is an alternative approach which does not require the number of clusters to be defined in advance. Let's jump right into it.
+
+### **Try agglomerative clustering**
+
+Hierarchical clustering creates clusters by either a *divisive* method or *agglomerative* method. The `divisive` method is a `top down` approach starting with the entire dataset and then finding partitions in a stepwise manner. `Agglomerative clustering` is a `bottom up` approach in which each observation is initially considered as a single element cluster and at each step of the algorithm, two clusters that are most similar are combined into a bigger cluster until all points are members of one single big cluster.
+
+
+**Question 6.**
+
+In this section we'll cluster the data using an agglomerative clustering algorithm. There are many functions available in R for hierarchical clustering.
+
+The `hclust()` function is one way to perform hierarchical clustering. It requires a distance matrix structure and a specification of the agglomeration method to be used. 
+
+- Use the `dist` function to compute the distance matrix (distances between the rows of the data) using the "euclidean" method.
+
+- Use `hclust` to perform Hierarchical clustering with the "ward.D2" (Ward linkage) agglomeration method.
+
+Please see the corresponding Learn module for more information on the above.
+
+
+```{r}
+# For reproducibility
+set.seed(2056)
+
+# Distance between observations matrix
+d <- ____(x = clust_estimate_data, method = "____")
+
+# Hierarchical clustering using Ward Linkage
+hclust_ward <- ____(d, method = "____")
+```
+
+
+```{r}
+. = ottr::check("tests/Question 6.R")
+```
+
+
+```{r}
+. = " # BEGIN TEST CONFIG
+
+success_message: Fantastic! You have successsfully performed hierarchical clustering using the Ward linkage method.
+failure_message: Almost there! Let's take a look at this again. Ensure you have used the Ward linkage method to perform Hierarchical clustering and the underlying distance metric used was the Euclidean distance.
+" # END TEST CONFIG
+
+
+## Test ##
+test_that('hierarchical clustering was computed', {
+  expect_equal(hclust_ward$dist.method, "euclidean")
+  expect_equal(hclust_ward$method, "ward.D2")
+  
+  
+})
+```
+The [factoextra](https://rpkgs.datanovia.com/factoextra/index.html) provides functions ([`fviz_dend()`](https://rdrr.io/pkg/factoextra/man/fviz_dend.html)) to visualize hierarchical clustering. Let's visualize the dendrogram representation of the clusters from the ward linkage method.
+
+
+```{r ward_viz, message=F, warning=F}
+library(factoextra)
+
+# Visualize cluster separations
+fviz_dend(hclust_ward, main = "Ward Linkage")
+```
+
+Although hierarchical clustering does not require one to pre-specify the number of clusters, one still needs to specify the number of clusters to extract.
+
+We found out, using the `WCSS` method, that the optimal number of clusters was 4. Let's color our dendrogram according to k = 4 and observe how observations will be grouped.
+
+```{r}
+# Visualize clustering structure for 4 groups
+fviz_dend(hclust_ward, k = 4, main = "Ward Linkage")
+```
+
+Perfect! We can now go ahead and `cut` the hierarchical clustering model into four clusters and extract the cluster labels for each observation associated with a given cut. This is done using `cutree()`
+
+**Question 7.**
+
+In this section, we are going to `cut` the hierarchical clustering model into four clusters and extract the cluster labels for each observation.
+
+Starting with the Principal Components version of the data:
+
+- Using the `cutree` function, extract k = 4 groups of data obtained from the Hierarchical clustering process. Assign this to a column name `cluster_id`
+
+- Also, encode the `cluster_id` column as a factor.
+
+
+
+
+```{r cutree}
+set.seed(2056)
+# Extract cluster labels obtained from the Hierarchical clustering process
+results_hclust <- features_2d %>% 
+  ____(cluster_id = ____)
+
+
+# Print some rows of the results
+results_hclust %>% 
+  slice_head(n = 5)
+```
+
+
+```{r}
+. = ottr::check("tests/Question 7.R")
+```
+
+
+
+Awesome! Now, let's inspect the cluster assignmnents visually.
+
+
+
+
+### **View the agglomerative cluster assignments**
+
+```{r}
+# Plot h-cluster assignmnet on the PC data
+hclust_spc_plot <- results_hclust %>% 
+  ggplot(mapping = aes(x = PC1, y = PC2)) +
+  geom_point(aes(shape = cluster_id, color = cluster_id), size = 2, alpha = 0.8) +
+  paletteer::scale_color_paletteer_d("ggsci::category10_d3")
+
+# Make plot interactive
+ggplotly(hclust_spc_plot)
+```
+
+Neat! How does this compare to the K-Means results we visualized earlier?
+
+We can see that the observations were grouped quite similarly by the two clustering algorithms, **K-Means Clustering** and **Hierarchical Clustering**. 
+
+We'll wrap it at that! In this challenge, you created unsupervised machine learning models, i.e K-Means and Hierarchical clustering models, to help you group unlabeled data observations into clusters. 
+
+Congratulations on this amazing feat!
+
+Happy Learning,
+
+[Eric](https://twitter.com/ericntay), Gold Microsoft Learn Student Ambassador.
+```{r include=FALSE}
+library(here)
+library(rmd2jupyter)
+rmd2jupyter("04_Clustering_Solution_Ottr_Learner.Rmd")
+```
