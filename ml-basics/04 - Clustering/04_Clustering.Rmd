@@ -248,7 +248,7 @@ We'll get to use `map()` from the [purrr](https://purrr.tidyverse.org/) package 
 
 > [`map()`](https://purrr.tidyverse.org/reference/map.html) functions allow you to replace many for loops with code that is both more succinct and easier to read. The best place to learn about the [`map()`](https://purrr.tidyverse.org/reference/map.html) functions is the [iteration chapter](http://r4ds.had.co.nz/iteration.html) in R for data science.
 >
-> `broom::augment.kmeans()` accepts a model object and returns a tibble with exactly one row of model summaries. The summaries are typically goodness of fit measures, p-values for hypothesis tests on residuals, or model convergence information.
+> `broom::glance.kmeans()` accepts a model object and returns a tibble with exactly one row of model summaries. The summaries are typically goodness of fit measures, p-values for hypothesis tests on residuals, or model convergence information.
 
 ```{r}
 set.seed(2056)
