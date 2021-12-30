@@ -21,7 +21,8 @@ Let's begin by importing the data.
 
 ```{r read_url, message=F, warning=F}
 # Load the core tidyverse and make it available in your current R session
-library(tidyverse)
+suppressPackageStartupMessages(
+  library(tidyverse))
 
 # Read the csv file into a tibble
 clust_data <- read_csv(file = "https://raw.githubusercontent.com/MicrosoftDocs/ml-basics/master/challenges/data/clusters.csv", show_col_types = FALSE)
@@ -57,7 +58,8 @@ For this question, create a specification of a `recipe` that will:
 ```{r pca_prep, message=F, warning=F}
 set.seed(2056)
 # Load the core tidymodels packages and make them available in your current R session
-library(tidymodels)
+suppressPackageStartupMessages(
+  library(tidymodels))
 
 # Specify a recipe
 pca_rec <- recipe(~ ., data = clust_data) %>%
@@ -86,8 +88,16 @@ suppressPackageStartupMessages({
 })
 
 ## Test ##
-test_that('data dimensions correct', {
-  expect_output(invisible(print(pca_rec)), "Recipe\n\nInputs:\n\n\nOperations:\n\nCentering and scaling for all_predictors()\nNo PCA components were extracted.", fixed = TRUE)
+test_that('recipe specification is correct', {
+  
+  # Test for step_normalize
+  expect_equal(attr(pca_rec[["steps"]][[1]], "class"), c("step_normalize","step"))
+  expect_equal(as_label(pca_rec[["steps"]][[1]][["terms"]][[1]]), "all_predictors()")
+  
+  # Test for step_pca
+  expect_equal(attr(pca_rec[["steps"]][[2]], "class"), c("step_pca","step"))
+  expect_equal(pca_rec[["steps"]][[2]]$num_comp, 2)
+  expect_equal(as_label(pca_rec[["steps"]][[2]][["terms"]][[1]]), "all_predictors()")
   
 })
 ```
@@ -136,12 +146,23 @@ failure_message: Almost there! Let's take a look at this again. Ensure you call 
 
 
 ## Test ##
-test_that('prep and bake results are correct', {
-  expect_output(invisible(print(pca_estimates)), "Recipe\n\nInputs:\n\n\nTraining data contained 1000 data points and no missing data.\n\nOperations:\n\nCentering and scaling for A, B, C [trained]\nPCA extraction with A, B, C [trained]", fixed = TRUE)
+test_that('recipe specification is correct', {
+  # Test for step_normalize
+  expect_equal(attr(pca_estimates[["steps"]][[1]], "class"), c("step_normalize","step"))
+  expect_equal(as_label(pca_estimates[["steps"]][[1]][["terms"]][[1]]), "all_predictors()")
+  expect_true(pca_estimates[["steps"]][[1]]$trained)
+  
+  # Test for step_pca
+  expect_equal(attr(pca_estimates[["steps"]][[2]], "class"), c("step_pca","step"))
+  expect_equal(pca_estimates[["steps"]][[2]]$num_comp, 2)
+  expect_equal(as_label(pca_estimates[["steps"]][[2]][["terms"]][[1]]), "all_predictors()")
+  expect_true(pca_estimates[["steps"]][[2]]$trained)
+  
+  # Test dimension of PCA results
   expect_equal(dim(features_2d), c(1000, 2))
   
-  
 })
+
 ```
 
 
@@ -341,9 +362,13 @@ In this section:
 
 
 ```{r viz_clust, message=F, warning=F}
-# Load plotting libraries 
-library(plotly)
-library(paletteer)
+# Load plotting libraries
+suppressPackageStartupMessages({
+  library(plotly)
+  library(paletteer)
+  
+})
+
 
 
 # Augment featured_2d with information from the clustering model
