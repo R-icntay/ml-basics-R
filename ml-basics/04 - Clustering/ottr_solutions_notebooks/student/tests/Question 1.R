@@ -14,8 +14,17 @@ test = list(
         })
 
         ## Test ##
+        ## Test ##
         test_that('recipe specification is correct', {
-          expect_output(invisible(print(pca_rec)), "Recipe\n\nInputs:\n\n\nOperations:\n\nCentering and scaling for all_predictors()\nNo PCA components were extracted.", fixed = TRUE)
+          
+          # Test for step_normalize
+          expect_equal(attr(pca_rec[["steps"]][[1]], "class"), c("step_normalize","step"))
+          expect_equal(as_label(pca_rec[["steps"]][[1]][["terms"]][[1]]), "all_predictors()")
+          
+          # Test for step_pca
+          expect_equal(attr(pca_rec[["steps"]][[2]], "class"), c("step_pca","step"))
+          expect_equal(pca_rec[["steps"]][[2]]$num_comp, 2)
+          expect_equal(as_label(pca_rec[["steps"]][[2]][["terms"]][[1]]), "all_predictors()")
           
         })
       }
