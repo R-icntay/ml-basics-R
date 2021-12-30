@@ -21,7 +21,8 @@ Let's begin by importing the data.
 
 ```{r read_url, message=F, warning=F}
 # Load the core tidyverse and make it available in your current R session
-library(tidyverse)
+suppressPackageStartupMessages(
+  library(tidyverse))
 
 # Read the csv file into a tibble
 clust_data <- read_csv(file = "https://raw.githubusercontent.com/MicrosoftDocs/ml-basics/master/challenges/data/clusters.csv", show_col_types = FALSE)
@@ -51,14 +52,15 @@ For this question, create a specification of a `recipe` that will:
 ```{r pca_prep, message=F, warning=F}
 set.seed(2056)
 # Load the core tidymodels packages and make them available in your current R session
-library(tidymodels)
+suppressPackageStartupMessages(
+  library(tidymodels))
 
 # Specify a recipe
 pca_rec <- recipe(____, data = clust_data) %>%
   # Recipe step for normalizing predictors
   ____(all_predictors()) %>% 
-  # Recipe step for converting all predictors into 2 PCs
-  step_pca(____, num_comp = ____, id = "pca")
+  # Recipe step for converting all predictors into 2 Principal Components
+  ____(____, num_comp = ____, id = "pca")
 
 # Print out recipe
 pca_rec
@@ -161,7 +163,7 @@ clust_estimate_data <- recipe(~ ., data = clust_data) %>%
   # Prep the recipe
   ____ %>% 
   # Apply trained recipe to train set: clust_data
-  bake(new_data = NULL)
+  ____
 
 # Print out data
 clust_estimate_data %>% 
@@ -269,8 +271,11 @@ In this section:
 
 ```{r viz_clust, message=F, warning=F}
 # Load plotting libraries 
-library(plotly)
-library(paletteer)
+suppressPackageStartupMessages({
+  library(plotly)
+  library(paletteer)
+  
+})
 
 
 # Augment featured_2d with information from the clustering model
