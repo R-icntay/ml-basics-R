@@ -629,8 +629,4 @@ Happy Learning,
 
 [Eric](https://twitter.com/ericntay), Gold Microsoft Learn Student Ambassador.
 
-```{r include=FALSE}
-library(here)
-library(rmd2jupyter)
-rmd2jupyter("03_Classification_Solution_Ottr.Rmd")
-```
+
