@@ -19,7 +19,7 @@ A significant part of a a data scientist's role is to explore, analyze, and visu
 Let's start by loading the required packages.
 
 ```{r}
-# Load the packages in the tidyverse into the current R session
+# Load packages that you'll require in this adventure
 suppressPackageStartupMessages({
   library(tidyverse)
   library(summarytools)
