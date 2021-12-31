@@ -9,8 +9,20 @@ test = list(
       failure_message = "",
       code = {
         ## Test ##
-        test_that('recipe specification is correct', {
-          expect_output(print(rf_workflow), "== Workflow ====================================================================\nPreprocessor: Recipe\nModel: rand_forest()\n\n-- Preprocessor ----------------------------------------------------------------\n3 Recipe Steps\n\n* step_rm()\n* step_mutate()\n* step_normalize()\n\n-- Model -----------------------------------------------------------------------\nRandom Forest Model Specification (regression)\n\nComputational engine: randomForest \n", fixed = TRUE)
+        test_that('workflow specification is correct', {
+          
+          # Test for step_rm
+          expect_equal(attr(rf_workflow[["pre"]][["actions"]][["recipe"]][["recipe"]][["steps"]][[1]], "class"), c("step_rm","step"))
+          expect_equal(as_label(rf_workflow[["pre"]][["actions"]][["recipe"]][["recipe"]][["steps"]][[1]][["terms"]][[1]]), "transaction_date")
+          
+          # Test for step_mutate
+          expect_equal(attr(rf_workflow[["pre"]][["actions"]][["recipe"]][["recipe"]][["steps"]][[2]], "class"), c("step_mutate","step"))
+          expect_equal(as_label(rf_workflow[["pre"]][["actions"]][["recipe"]][["recipe"]][["steps"]][[2]][["inputs"]][["local_convenience_stores"]]), "factor(local_convenience_stores)")
+          
+          # Test for step_normalize
+          expect_equal(attr(rf_workflow[["pre"]][["actions"]][["recipe"]][["recipe"]][["steps"]][[3]], "class"), c("step_normalize","step"))
+          expect_equal(as_label(rf_workflow[["pre"]][["actions"]][["recipe"]][["recipe"]][["steps"]][[3]][["terms"]][[1]]), "all_numeric_predictors()")
+          
           
           
         })
